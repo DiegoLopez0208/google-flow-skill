@@ -1,0 +1,18 @@
+# Python
+__pycache__/
+*.pyc
+
+# Variables de entorno (por si alguien agrega una .env)
+.env
+
+# Capturas de depuracion
+_debug/
+
+# Guion privado del video (no publicar)
+GUIA_VIDEO.md
+
+# NUNCA subir tu sesion de Google (cookies) ni tus resultados generados.
+session/*
+!session/LEEME.txt
+outputs/*
+!outputs/LEEME.txt

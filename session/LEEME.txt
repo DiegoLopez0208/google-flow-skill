@@ -1,0 +1,2 @@
+Sesion persistente de Chrome. Se llena al correr: python flow.py login
+No borres esta carpeta si quieres mantener tu sesion.
