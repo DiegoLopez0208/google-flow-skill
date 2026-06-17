@@ -39,8 +39,8 @@ async def create_project() -> tuple[str, str]:
     Debe llamarse mientras se sostiene get_lock().
     """
     page = await get_page()
-    await page.goto(FLOW_BASE_URL, wait_until="networkidle")
-    await page.wait_for_load_state("networkidle")
+    await page.goto(FLOW_BASE_URL, wait_until="domcontentloaded")
+    await page.wait_for_load_state("domcontentloaded")
     await page.wait_for_timeout(3000)
 
     # Cerrar modal de novedades si aparece
@@ -52,8 +52,9 @@ async def create_project() -> tuple[str, str]:
     except Exception:
         pass
 
-    # Click en Proyecto nuevo
+    # Click en Proyecto nuevo (esperar a que el SPA lo pinte)
     new_btn = page.locator('button:has-text("Proyecto nuevo")')
+    await new_btn.first.wait_for(state="visible", timeout=15000)
     await new_btn.first.click()
 
     # Esperar URL de proyecto
@@ -62,7 +63,7 @@ async def create_project() -> tuple[str, str]:
     project_uuid = project_url.rstrip("/").split("/")[-1]
 
     # Esperar SPA render — CRÍTICO sin esto pantalla negra
-    await page.wait_for_load_state("networkidle")
+    await page.wait_for_load_state("domcontentloaded")
     await page.wait_for_timeout(5000)
     await page.wait_for_selector('button:has-text("Crear"), button:has-text("Banana"), button:has-text("Veo")', timeout=15000)
 
@@ -76,8 +77,8 @@ async def navigate_to_project(project_uuid: str) -> None:
     page = await get_page()
     target_url = f"{FLOW_BASE_URL}/project/{project_uuid}"
     if page.url != target_url:
-        await page.goto(target_url, wait_until="networkidle")
-        await page.wait_for_load_state("networkidle")
+        await page.goto(target_url, wait_until="domcontentloaded")
+        await page.wait_for_load_state("domcontentloaded")
         await page.wait_for_timeout(5000)
         await page.wait_for_selector('button:has-text("Crear"), button:has-text("Banana"), button:has-text("Veo")', timeout=15000)
 

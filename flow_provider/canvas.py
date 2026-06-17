@@ -154,35 +154,57 @@ SEL_UPLOAD_BTN = ':text-is("Subir imagen")'
 SEL_SLOT_LOADED = 'img[alt*="contenido multimedia"]'
 
 async def upload_frame(file_path: str, slot: str = "initial") -> None:
-    """Sube un frame para modo Fotogramas. slot: 'initial' o 'final'."""
+    """Sube un frame local para modo Fotogramas. slot: 'initial' o 'final'."""
     page = await get_page()
-    
-    await page.wait_for_selector(SEL_SLOTS_INICIAR, state="visible", timeout=10000)
-    target_slot = page.locator(SEL_SLOTS_INICIAR) if slot == "initial" else page.locator(SEL_SLOTS_FIN)
-    
-    initial_count = await page.locator(SEL_SLOT_LOADED).count()
-    await target_slot.click()
-    await page.wait_for_timeout(2000)
-    
-    async with page.expect_file_chooser(timeout=5000) as fc_info:
+    try:
+        await page.wait_for_selector(SEL_SLOTS_INICIAR, state="visible", timeout=10000)
+        target_slot = page.locator(SEL_SLOTS_INICIAR) if slot == "initial" else page.locator(SEL_SLOTS_FIN)
+
+        initial_count = await page.locator(SEL_SLOT_LOADED).count()
+        await target_slot.click()
+        await page.wait_for_timeout(3000)
+
         import re
         upload_btn = page.locator('button, [role="button"], div').filter(
             has_text=re.compile(r"(Cargar medios|Upload media|Subir imagen)", re.IGNORECASE)
         ).first
         if await upload_btn.count() == 0:
             raise Exception("Botón de subida ('Cargar medios' / 'Upload') no encontrado para el slot.")
-        await upload_btn.click(force=True)
-    file_chooser = await fc_info.value
-    await file_chooser.set_files(file_path)
-    
-    await page.wait_for_function(
-        f"""() => {{
-            const imgs = document.querySelectorAll('{SEL_SLOT_LOADED}');
-            if (imgs.length <= {initial_count}) return false;
-            return [...imgs].some(img => img.complete && img.naturalWidth > 0);
-        }}""",
-        timeout=60000
-    )
+
+        # Preferir subir directo al input[type=file]; si no existe, usar el file chooser.
+        inputs = page.locator('input[type="file"]')
+        if await inputs.count() > 0:
+            await inputs.first.set_input_files(file_path)
+        else:
+            async with page.expect_file_chooser(timeout=8000) as fc_info:
+                await upload_btn.click(force=True)
+            file_chooser = await fc_info.value
+            await file_chooser.set_files(file_path)
+
+        # Confirmar con 'Agregar a la instrucción' para insertar el frame en el slot.
+        add_btn = page.locator('button, [role="button"]').filter(
+            has_text=re.compile(r"(Agregar a la instrucción|Add to instruction|Add to prompt)", re.IGNORECASE)
+        ).first
+        await add_btn.wait_for(state="visible", timeout=15000)
+        await add_btn.click()
+        await page.wait_for_timeout(1000)
+
+        await page.wait_for_function(
+            f"""() => {{
+                const imgs = document.querySelectorAll('{SEL_SLOT_LOADED}');
+                if (imgs.length <= {initial_count}) return false;
+                return [...imgs].some(img => img.complete && img.naturalWidth > 0);
+            }}""",
+            timeout=60000
+        )
+    except Exception as e:
+        from pathlib import Path
+        debug_dir = Path(__file__).parent.parent / "_debug"
+        debug_dir.mkdir(parents=True, exist_ok=True)
+        shot = str(debug_dir / f"upload_frame_error_{slot}.png")
+        await page.screenshot(path=shot)
+        print(f"  [ERROR] upload_frame falló: {e}. Captura: {shot}")
+        raise
 
 
 async def select_frame_from_project(uuid: str, slot: str = "initial") -> None:

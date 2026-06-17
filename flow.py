@@ -48,6 +48,12 @@ from playwright.async_api import async_playwright
 import flow_provider as flow
 from flow_provider import settings
 
+# Consola UTF-8 en Windows (acentos/emojis sin romper la salida).
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8")
+
 BASE_DIR = Path(__file__).parent.resolve()
 DEFAULT_OUT = BASE_DIR / "outputs"
 FLOW_URL = "https://labs.google/fx/es-419/tools/flow"
