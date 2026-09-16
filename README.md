@@ -15,7 +15,7 @@ script"*.
 ## Install as a Claude Code plugin
 
 ```
-/plugin marketplace add DiegoLopez0208/google-flow-skill-v1
+/plugin marketplace add DiegoLopez0208/google-flow-skill
 /plugin install google-flow
 ```
 
@@ -31,12 +31,12 @@ You still need `python setup.py` and `python flow.py login` once.
 ### Option A — from GitHub, without downloading anything yourself
 Open your AI agent in an empty folder and tell it:
 
-> **"Clone this repo and install the Google Flow skill: `https://github.com/DiegoLopez0208/google-flow-skill-v1`"**
+> **"Clone this repo and install the Google Flow skill: `https://github.com/DiegoLopez0208/google-flow-skill`"**
 
 The agent will do this on its own:
 ```powershell
-git clone https://github.com/DiegoLopez0208/google-flow-skill-v1
-cd google-flow-skill-v1
+git clone https://github.com/DiegoLopez0208/google-flow-skill
+cd google-flow-skill
 python setup.py        # installs dependencies + browser
 python flow.py login   # opens Chrome -> you sign in -> session is saved
 ```
@@ -109,16 +109,22 @@ One-off commands land in `outputs/`; each `batch` is grouped into
 > more reason to care than a read-only tool would. A secondary account is the
 > cautious choice, not a required one.
 
-## What this fork changes
+## Where this comes from
 
-Fork of [BRPLia/google-flow-skill-v1](https://github.com/BRPLia/google-flow-skill-v1).
+This started from [BRPLia/google-flow-skill-v1](https://github.com/BRPLia/google-flow-skill-v1)
+(MIT), whose shape — a narrow CLI plus a manual the agent reads — is the right
+idea and worth the credit. It is now maintained here as its own project: the
+browser layer was rewritten, downloads moved off the browser entirely, and
+credits, logout, plugin packaging and tests were added.
+
 Per-release detail lives in [CHANGELOG.md](CHANGELOG.md).
 
-### Port to Flow's new UI (2026-09-16)
+### Ported to Flow's new UI (2026-09-16)
 
 Google rewrote Flow: it moved to `flow.google.com` and switched from React/Radix
-to Angular Material. **None of the original selectors work anymore.** This fork
-is ported and verified against the current UI:
+to Angular Material. **None of the original selectors match anymore**, so the
+older version cannot drive Flow at all. This one is ported and verified against
+the current UI:
 
 | What | Status |
 |---|---|
@@ -220,7 +226,7 @@ flow-tile-container                                     each result
 Selectors are anchored to google-symbols **icon names** (`image`, `videocam`,
 `crop_9_16`, `x1`) because those don't get translated, unlike the visible labels.
 
-### Logic fixes (these hold on any UI)
+### Logic fixes carried over from the original (these hold on any UI)
 - `--image` / `--refs` now **do** attach the reference to the prompt. Before, the
   image was left loose on the canvas and generation ignored it.
 - The retry on "No se pudo generar" works inside a `batch` again. It used to only

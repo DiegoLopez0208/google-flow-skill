@@ -3,10 +3,17 @@
   "description": "Maneja Google Flow (flow.google.com) desde un agente: genera y descarga imagenes con Nano Banana y videos con Veo, en lote y con referencias de personaje. Login por navegador una vez; el resto por la API de Flow.",
   "version": "2.0.0",
   "author": {
-    "name": "BRPL",
-    "url": "https://github.com/BRPLia/google-flow-skill-v1"
+    "name": "Diego Lopez",
+    "url": "https://github.com/DiegoLopez0208"
   },
-  "homepage": "https://github.com/DiegoLopez0208/google-flow-skill-v1",
+  "homepage": "https://github.com/DiegoLopez0208/google-flow-skill",
   "license": "MIT",
-  "keywords": ["google-flow", "veo", "nano-banana", "video", "imagen", "playwright"]
+  "keywords": [
+    "google-flow",
+    "veo",
+    "nano-banana",
+    "video",
+    "imagen",
+    "playwright"
+  ]
 }
