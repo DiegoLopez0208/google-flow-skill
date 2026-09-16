@@ -4,7 +4,7 @@ Tienes UNA habilidad en esta carpeta: **manejar Google Flow** (labs.google) para
 generar y descargar imagenes y videos. Lo haces con UNA sola herramienta: `flow.py`.
 
 ## Empieza aqui
-1. Lee `SKILL.md`: es tu manual completo. Ignora `flow_provider/` (motor interno).
+1. Lee `skills/google-flow/SKILL.md`: es tu manual completo. Ignora `flow_provider/` (motor interno).
 2. **Instalate tu solo** la primera vez: ejecuta `python setup.py` (instala dependencias y
    el navegador). Tienes terminal; no se lo pidas al usuario.
 3. Luego `python flow.py status`. Si dice "SIN SESION", ejecuta `python flow.py login` y pide
@@ -14,6 +14,7 @@ generar y descargar imagenes y videos. Lo haces con UNA sola herramienta: `flow.
 
 ## Comandos que usas
 ```
+python flow.py creditos
 python flow.py login
 python flow.py status
 python flow.py image --prompt "DESCRIPCION VISUAL EN INGLES" --name escena1
@@ -25,6 +26,8 @@ python flow.py clean nombre_proyecto
 ```
 
 ## Como pensar
+- Primero los creditos: `python flow.py creditos`. Generar cuesta, y un video de Veo
+  cuesta ~10x una imagen. Si el saldo esta bajo, decilo antes de armar el guion.
 - El usuario te pasa una lista de prompts o un guion con escenas. Separa cada escena.
 - En cada escena: si hay prompt de imagen Y de video -> primero imagen, luego anima esa
   imagen como `--start` del video. Si solo hay uno, haz solo ese.

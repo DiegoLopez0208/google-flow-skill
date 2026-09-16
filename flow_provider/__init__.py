@@ -16,8 +16,15 @@ La API util es esta, y la orquestacion vive en flow.py:
     download_assets               los baja por UUID
 """
 from . import api
+from .credits import (
+    COSTO_ESTIMADO,
+    aviso_de_pocos_creditos,
+    estimar_costo,
+    leer_creditos,
+)
 from .browser import (
     navegador_vivo,
+    uuids_vistos,
     startup,
     shutdown,
     get_page,
@@ -48,7 +55,8 @@ from .download import (
 
 __all__ = [
     "api",
-    "startup", "shutdown", "get_page", "get_lock", "navegador_vivo",
+    "leer_creditos", "aviso_de_pocos_creditos", "estimar_costo", "COSTO_ESTIMADO",
+    "startup", "shutdown", "get_page", "get_lock", "navegador_vivo", "uuids_vistos",
     "create_project", "navigate_to_project",
     "select_image_mode", "select_video_mode",
     "upload_media", "upload_standalone_image",

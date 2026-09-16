@@ -32,9 +32,25 @@ class FakeFlow:
         self.assets: list[dict] = []
         self._n = 0
         self._vivo = True
+        self.creditos = None
 
     def _log(self, name, *args, **kwargs):
         self.calls.append((name, args, kwargs))
+
+    COSTO_ESTIMADO = {"image": 1, "video": 10}
+
+    def __init_creditos__(self):
+        pass
+
+    async def leer_creditos(self):
+        return self.creditos
+
+    def estimar_costo(self, jobs):
+        return sum(self.COSTO_ESTIMADO.get(j.get("type", "image"), 1) * int(j.get("count", 1) or 1)
+                   for j in jobs)
+
+    def uuids_vistos(self):
+        return []
 
     def navegador_vivo(self):
         return self._vivo
@@ -142,11 +158,33 @@ class BatchWiringTest(unittest.TestCase):
         cli.api = self._real_api
         self.tmp.cleanup()
 
-    def _run_batch(self, data):
+    def _run_batch(self, data, ignorar_creditos=False):
         jobfile = Path(self.tmp.name) / "guion.json"
         jobfile.write_text(json.dumps(data), encoding="utf-8")
-        args = Namespace(jobfile=str(jobfile), out=str(self.out))
+        args = Namespace(jobfile=str(jobfile), out=str(self.out),
+                         ignorar_creditos=ignorar_creditos)
         return asyncio.run(cli.cmd_batch(args))
+
+    def test_corta_si_los_creditos_no_alcanzan(self):
+        self.fake.creditos = 5
+        code = self._run_batch({
+            "project": "demo",
+            "jobs": [{"type": "video", "name": "a", "prompt": "p"}],
+        })
+        self.assertEqual(code, 1)
+        report = json.loads((self.out / "demo" / "batch_report.json").read_text(encoding="utf-8"))
+        self.assertIn("creditos", report[0]["error"])
+        # no se genero nada
+        self.assertEqual(self.fake.find("submit_prompt"), [])
+
+    def test_ignorar_creditos_genera_igual(self):
+        self.fake.creditos = 5
+        code = self._run_batch({
+            "project": "demo",
+            "jobs": [{"type": "video", "name": "a", "prompt": "p"}],
+        }, ignorar_creditos=True)
+        self.assertEqual(code, 0)
+        self.assertEqual(len(self.fake.find("submit_prompt")), 1)
 
     def test_ingredientes_reusan_el_asset_del_proyecto(self):
         code = self._run_batch({

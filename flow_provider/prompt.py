@@ -29,7 +29,18 @@ async def submit_prompt(prompt: str, typing_delay_ms: int = 5) -> None:
     await page.keyboard.type(prompt, delay=typing_delay_ms)
     await page.wait_for_timeout(500)
 
+    # El boton aparece recien cuando el editor tiene texto, y un overlay a medio
+    # cerrar lo tapa: se espera y se reintenta en vez de fallar de una.
     submit = page.locator(SEL_SUBMIT)
-    if await submit.count() == 0:
-        raise RuntimeError("No se encontro el boton de enviar (Iniciar generacion).")
-    await submit.first.click()
+    for intento in range(3):
+        try:
+            await submit.first.wait_for(state="visible", timeout=6000)
+            await submit.first.click()
+            return
+        except Exception:
+            await cerrar_overlays(page)
+            await box.first.click()
+            await page.wait_for_timeout(800)
+    raise RuntimeError(
+        "No se encontro el boton de enviar (Iniciar generacion) tras tres intentos."
+    )

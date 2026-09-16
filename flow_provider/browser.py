@@ -5,6 +5,7 @@ Ambos se llaman una vez por comando de flow.py.
 """
 import asyncio
 import os
+import re
 import sys
 from pathlib import Path
 from playwright.async_api import async_playwright, BrowserContext, Page, Playwright
@@ -61,6 +62,11 @@ _playwright: Playwright | None = None
 _context: BrowserContext | None = None
 _page: Page | None = None
 _guardia: Page | None = None
+
+# UUIDs de assets vistos en las respuestas que Flow le manda al navegador.
+# Es la via mas fiable de conocerlos: las imagenes no los exponen en el DOM y
+# la API propia tarda en indexarlos.
+_assets_vistos: list[str] = []
 _lock = asyncio.Lock()
 
 
@@ -127,6 +133,9 @@ async def _launch() -> None:
     await _guardia.goto("about:blank")
     await _page.bring_to_front()
 
+    _assets_vistos.clear()
+    _page.on("response", _espiar_respuesta)
+
     if os.getenv("FLOW_DEBUG"):
         import traceback
         _page.on("close", lambda _: print("  [debug] se cerro la pagina"))
@@ -190,3 +199,30 @@ def navegador_vivo() -> bool:
         return not _page.is_closed()
     except Exception:
         return False
+
+
+def _espiar_respuesta(resp) -> None:
+    """Anota los UUIDs de asset que aparecen en las respuestas de Flow."""
+    if "batchexecute" not in resp.url:
+        return
+
+    async def leer():
+        try:
+            texto = await resp.text()
+        except Exception:
+            return
+        for uuid in re.findall(
+            r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", texto
+        ):
+            if uuid not in _assets_vistos:
+                _assets_vistos.append(uuid)
+
+    try:
+        asyncio.get_running_loop().create_task(leer())
+    except RuntimeError:
+        pass
+
+
+def uuids_vistos() -> list[str]:
+    """UUIDs observados en el trafico, en orden de aparicion."""
+    return list(_assets_vistos)

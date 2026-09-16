@@ -161,6 +161,56 @@ async def cmd_login(_args) -> int:
     return 1
 
 
+async def cmd_creditos(_args) -> int:
+    """Muestra los creditos que quedan en la cuenta."""
+    if not session_exists():
+        print("SIN SESION. Corre primero: python flow.py login")
+        return 1
+    await flow.startup()
+    try:
+        page = await flow.get_page()
+        await page.goto("https://flow.google.com", wait_until="domcontentloaded")
+        await page.wait_for_timeout(8000)
+        saldo = await flow.leer_creditos()
+        if saldo is None:
+            print("No se pudo leer el saldo de creditos.")
+            return 1
+        print(f"Creditos de Google Flow: {saldo}")
+        print(f"Referencia de costo: imagen ~{flow.COSTO_ESTIMADO['image']}, "
+              f"video ~{flow.COSTO_ESTIMADO['video']} por generacion.")
+        if saldo < flow.COSTO_ESTIMADO["video"]:
+            print("No alcanzan para un video. Los creditos se restablecen cada mes.")
+        return 0
+    finally:
+        await flow.shutdown()
+
+
+async def cmd_logout(args) -> int:
+    """Borra la sesion guardada: perfil de Chrome y cache de la API."""
+    perfil = Path(settings.FLOW_CHROME_PROFILE)
+    cache_api = perfil.parent / "api_session.json"
+    objetivos = [p for p in (perfil, cache_api) if p.exists()]
+    if not objetivos:
+        print("No hay sesion guardada: nada que borrar.")
+        return 0
+
+    print("Se va a borrar la sesion de Google guardada:")
+    for p in objetivos:
+        print(f"  {p}")
+    if not args.si:
+        print("\nEsto cierra la sesion y habra que volver a correr 'login'.")
+        print("Para confirmar: python flow.py logout --si")
+        return 1
+
+    for p in objetivos:
+        if p.is_dir():
+            shutil.rmtree(p, ignore_errors=True)
+        else:
+            p.unlink(missing_ok=True)
+    print("Sesion borrada. Para volver a usar la skill: python flow.py login")
+    return 0
+
+
 async def cmd_status(_args) -> int:
     if session_exists():
         print(f"OK: sesion presente en {settings.FLOW_CHROME_PROFILE}")
@@ -174,7 +224,7 @@ async def cmd_status(_args) -> int:
 # ---------------------------------------------------------------------------
 # Proyecto Flow de la corrida actual. Se necesita para volver a entrar si hay
 # que relanzar el navegador a mitad de camino.
-_PROYECTO = {"uuid": None}
+_PROYECTO = {"uuid": None, "creditos": None}
 
 # El src de un asset lleva un token que vence: al recargar el proyecto cambia.
 # Se guarda ademas su posicion en el canvas para poder reubicarlo.
@@ -184,6 +234,11 @@ _POSICIONES: dict[str, int] = {}
 async def _abrir_proyecto() -> None:
     uuid, _url = await flow.create_project()
     _PROYECTO["uuid"] = uuid
+    # Consultar creditos es gratis y el navegador ya esta abierto.
+    saldo = await flow.leer_creditos()
+    _PROYECTO["creditos"] = saldo
+    if saldo is not None:
+        print(f"  creditos disponibles: {saldo}")
     # La sesion de API sale de la misma pagina: no cuesta un navegador extra.
     try:
         await api.exportar_desde_pagina(await flow.get_page())
@@ -212,72 +267,102 @@ async def _asegurar_navegador() -> None:
         await _relanzar_navegador()
 
 
+def _revisar_presupuesto(jobs: list[dict], ignorar: bool) -> None:
+    """Corta antes de gastar si los creditos no alcanzan.
+
+    El costo por generacion no lo publica Google: los numeros de COSTO_ESTIMADO
+    son una cota para avisar, no una factura. Por eso se puede seguir igual con
+    --ignorar-creditos.
+    """
+    saldo = _PROYECTO.get("creditos")
+    if saldo is None:
+        return
+    costo = flow.estimar_costo(jobs)
+    print(f"  costo estimado: ~{costo} credito(s) para {len(jobs)} trabajo(s)")
+    if costo <= saldo:
+        return
+    aviso = (f"Te quedan {saldo} creditos y este lote puede costar ~{costo}. "
+             f"Referencia: imagen ~{flow.COSTO_ESTIMADO['image']}, "
+             f"video ~{flow.COSTO_ESTIMADO['video']}.")
+    if ignorar:
+        print(f"  AVISO: {aviso} Sigo porque se paso --ignorar-creditos.")
+        return
+    raise RuntimeError(
+        aviso + " Se corto antes de gastar. Reduci el lote, o pasa "
+        "--ignorar-creditos si queres intentarlo igual."
+    )
+
+
 def _es_navegador_caido(e: Exception) -> bool:
     texto = str(e).lower()
     return "closed" in texto or "crash" in texto or "disconnected" in texto
 
 
-async def _descargar_por_api(previos_api, out_path, esperados):
+async def _inventario() -> list:
+    """UUIDs de asset conocidos hasta ahora.
+
+    Se toman del trafico que Flow le manda al navegador: las imagenes no
+    exponen su UUID en el DOM, y consultar la API por nuestra cuenta llega
+    tarde porque el backend tarda en indexar lo recien generado.
+    """
+    try:
+        return flow.uuids_vistos()
+    except Exception:
+        return []
+
+
+async def _descargar_por_api(previos, out_path, esperados, tipo=None):
     """Baja los assets nuevos por HTTP. Devuelve los paths, o None si no aplica.
 
     Es el camino preferido: la descarga por menu del navegador es justo donde
     Chrome se cae.
     """
     proyecto = _PROYECTO["uuid"]
-    if not proyecto or previos_api is None:
-        print("  sin inventario previo por API; uso el navegador")
+    if not proyecto or previos is None:
         return None
+    sesion = api.cargar_sesion()
+    if not sesion:
+        return None
+
+    vistos = set(previos)
+    candidatos = []
+    for espera in (0, 2, 4, 6):
+        if espera:
+            await asyncio.sleep(espera)
+        candidatos = [u for u in await _inventario()
+                      if u not in vistos and u != proyecto]
+        if candidatos:
+            break
+    if not candidatos:
+        print("  no aparecio el id del resultado; uso el navegador")
+        return None
+
+    # Un UUID nuevo puede ser cualquier cosa (una escena, un trabajo). Solo
+    # sirve el que responda con una URL de contenido.
+    descargables = []
+    for uuid in candidatos:
+        try:
+            if api.datos_asset(uuid, sesion, tipo)["url"]:
+                descargables.append(uuid)
+        except Exception:
+            continue
+        if len(descargables) >= esperados:
+            break
+    if not descargables:
+        print("  ningun id nuevo tenia archivo asociado; uso el navegador")
+        return None
+
+    print(f"  descarga por API ({len(descargables)} archivo(s), sin navegador)")
+    base = Path(out_path)
+    salidas = []
     try:
-        sesion = api.cargar_sesion()
-        # El backend tarda unos segundos en indexar lo recien generado.
-        nuevos = []
-        for espera in (0, 3, 5, 8):
-            if espera:
-                await asyncio.sleep(espera)
-            nuevos = [u for u in api.listar_assets(proyecto, sesion) if u not in previos_api]
-            if nuevos:
-                break
-        if not nuevos:
-            print("  la API todavia no ve el resultado; uso el navegador")
-            return None
-        nuevos = nuevos[:esperados]
-        print(f"  descarga por API ({len(nuevos)} archivo(s), sin navegador)")
-        base = Path(out_path)
-        salidas = []
-        for i, uuid in enumerate(nuevos, 1):
-            destino = base if len(nuevos) == 1 else base.with_name(f"{base.stem}_{i}{base.suffix}")
-            salidas.append(api.descargar(uuid, str(destino), sesion))
+        for i, uuid in enumerate(descargables, 1):
+            destino = base if len(descargables) == 1 else base.with_name(f"{base.stem}_{i}{base.suffix}")
+            salidas.append(api.descargar(uuid, str(destino), sesion, tipo))
         return salidas
     except Exception as e:
-        print(f"  la descarga por API no salio ({type(e).__name__}); uso el navegador")
+        print(f"  la descarga por API fallo ({type(e).__name__}); uso el navegador")
         return None
-
-
-async def _assets_api() -> set | None:
-    """UUIDs actuales del proyecto segun la API. None si la API no esta lista.
-
-    Si la sesion caduco se refresca desde la pagina que ya esta abierta.
-    """
-    proyecto = _PROYECTO["uuid"]
-    if not proyecto:
-        return None
-    for intento in range(2):
-        try:
-            return set(api.listar_assets(proyecto))
-        except api.SesionExpirada:
-            if intento == 0:
-                print("  la sesion de API caduco; la refresco")
-                try:
-                    if await api.exportar_desde_pagina(await flow.get_page()):
-                        continue
-                except Exception:
-                    pass
-            return None
-        except Exception as e:
-            print(f"  la API no respondio ({type(e).__name__}); sigo con el navegador")
-            return None
-    return None
-
 
 async def _descargar(nuevos, out_path, resolution):
     """Descarga los assets recien generados, sobreviviendo a una caida de Chrome.
@@ -392,13 +477,13 @@ async def _gen_image(prompt, ratio, model, count, refs, out_path,
     if refs:
         await _attach_refs(refs)
     previos = await flow.snapshot_assets()
-    previos_api = await _assets_api()
+    previos_api = await _inventario()
     await flow.submit_prompt(prompt)
     nuevos = await flow.wait_for_new_assets(previos, esperados=count,
                                             is_video=False, timeout_ms=240_000)
     if label and nuevos:
         await _registrar(label, nuevos[0])
-    saved = await _descargar_por_api(previos_api, out_path, count)
+    saved = await _descargar_por_api(previos_api, out_path, count, "image")
     return saved if saved else await _descargar(nuevos, out_path, resolution)
 
 
@@ -411,13 +496,13 @@ async def _gen_video(prompt, ratio, model, count, start, end, refs, out_path,
     if refs:
         await _attach_refs(refs)
     previos = await flow.snapshot_assets()
-    previos_api = await _assets_api()
+    previos_api = await _inventario()
     await flow.submit_prompt(prompt)
     nuevos = await flow.wait_for_new_assets(previos, esperados=count,
                                             is_video=True, timeout_ms=600_000)
     if label and nuevos:
         await _registrar(label, nuevos[0])
-    saved = await _descargar_por_api(previos_api, out_path, count)
+    saved = await _descargar_por_api(previos_api, out_path, count, "video")
     return saved if saved else await _descargar(nuevos, out_path, resolution)
 
 
@@ -496,6 +581,7 @@ async def cmd_batch(args) -> int:
     await flow.startup()
     try:
         await _abrir_proyecto()
+        _revisar_presupuesto(jobs, getattr(args, "ignorar_creditos", False))
         for i, job in enumerate(jobs, 1):
             jtype = job.get("type", "image")
             name = job.get("name") or f"{jtype}_{i:02d}"
@@ -584,6 +670,11 @@ def build_parser() -> argparse.ArgumentParser:
 
     sub.add_parser("login", help="Loguearse en Google Flow (una vez).")
     sub.add_parser("status", help="Ver si hay sesion guardada.")
+    sub.add_parser("creditos", help="Ver los creditos que quedan en la cuenta.")
+
+    pl = sub.add_parser("logout", help="Borrar la sesion guardada.")
+    pl.add_argument("--si", action="store_true",
+                    help="Confirmar el borrado sin preguntar.")
 
     pi = sub.add_parser("image", help="Generar una imagen.")
     pi.add_argument("--prompt", required=True)
@@ -617,6 +708,8 @@ def build_parser() -> argparse.ArgumentParser:
     pb = sub.add_parser("batch", help="Ejecutar guion JSON de varios trabajos.")
     pb.add_argument("jobfile")
     pb.add_argument("--out", default=str(DEFAULT_OUT))
+    pb.add_argument("--ignorar-creditos", dest="ignorar_creditos", action="store_true",
+                    help="Generar aunque el saldo estimado no alcance.")
 
     pc = sub.add_parser("clean", help="Borrar resultados de outputs.")
     pc.add_argument("project", nargs="?", default=None,
@@ -629,6 +722,8 @@ def build_parser() -> argparse.ArgumentParser:
 HANDLERS = {
     "login": cmd_login,
     "status": cmd_status,
+    "creditos": cmd_creditos,
+    "logout": cmd_logout,
     "image": cmd_image,
     "video": cmd_video,
     "batch": cmd_batch,

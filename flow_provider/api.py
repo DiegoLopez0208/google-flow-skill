@@ -247,19 +247,26 @@ def listar_assets(project_uuid: str, sesion: dict | None = None) -> list[str]:
     return [u for u in buscar_assets(resp) if u != project_uuid]
 
 
-def datos_asset(asset_uuid: str, sesion: dict | None = None) -> dict:
-    """Datos de un asset. Incluye la URL del archivo original."""
+def datos_asset(asset_uuid: str, sesion: dict | None = None, tipo: str | None = None) -> dict:
+    """Datos de un asset. Incluye las URLs del contenido original."""
     resp = llamar("as29s", [asset_uuid], sesion)
-    return {"uuid": asset_uuid, "url": _buscar_url_contenido(resp), "crudo": resp}
+    urls = buscar_urls_contenido(resp)
+    return {
+        "uuid": asset_uuid,
+        "urls": urls,
+        "url": elegir_url(urls, tipo),
+        "crudo": resp,
+    }
 
 
-def descargar(asset_uuid: str, destino: str, sesion: dict | None = None) -> str:
+def descargar(asset_uuid: str, destino: str, sesion: dict | None = None,
+              tipo: str | None = None) -> str:
     """Baja el archivo original de un asset. Devuelve el path guardado.
 
     Sin navegador: por eso no puede caerse Chrome a mitad de la descarga.
     """
     sesion = sesion or cargar_sesion()
-    datos = datos_asset(asset_uuid, sesion)
+    datos = datos_asset(asset_uuid, sesion, tipo)
     url = datos["url"]
     if not url:
         raise RuntimeError(f"El asset {asset_uuid} no expuso una URL de descarga.")
@@ -289,16 +296,33 @@ def _buscar_uuid(nodo) -> str | None:
     return None
 
 
-def _buscar_url_contenido(nodo) -> str | None:
-    """Primera URL de flow-content.google dentro de la respuesta."""
+def buscar_urls_contenido(nodo, urls=None) -> list[str]:
+    """Todas las URLs de flow-content.google de la respuesta, en orden."""
+    if urls is None:
+        urls = []
     if isinstance(nodo, str):
-        return nodo if nodo.startswith("https://flow-content.google/") else None
-    if isinstance(nodo, list):
+        if nodo.startswith("https://flow-content.google/") and nodo not in urls:
+            urls.append(nodo)
+    elif isinstance(nodo, list):
         for x in nodo:
-            r = _buscar_url_contenido(x)
-            if r:
-                return r
-    return None
+            buscar_urls_contenido(x, urls)
+    return urls
+
+
+def elegir_url(urls: list[str], tipo: str | None) -> str | None:
+    """Elige la URL del medio pedido.
+
+    Un video trae ademas la URL de su miniatura, y quedarse con la primera
+    bajaba un PNG de 46 KB en lugar del MP4.
+    """
+    if not urls:
+        return None
+    if tipo == "video":
+        return next((u for u in urls if "/video/" in u), urls[0])
+    if tipo == "image":
+        return next((u for u in urls if "/image/" in u), urls[0])
+    # Sin preferencia: el video manda, porque es el archivo de verdad.
+    return next((u for u in urls if "/video/" in u), urls[0])
 
 
 def buscar_assets(nodo, encontrados=None) -> list[str]:

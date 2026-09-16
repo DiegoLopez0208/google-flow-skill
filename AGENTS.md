@@ -4,7 +4,7 @@ Eres un agente con UNA capacidad en esta carpeta: **manejar Google Flow** (labs.
 para generar y descargar imagenes y videos con una sola CLI: `flow.py`.
 
 ## Lo que debes saber al entrar
-1. Lee `SKILL.md` (es tu manual completo). No leas dentro de `flow_provider/`: es motor interno.
+1. Lee `skills/google-flow/SKILL.md` (es tu manual completo). No leas dentro de `flow_provider/`: es motor interno.
 2. **Instalate tu solo** la primera vez: corre `python setup.py` (instala dependencias y el
    navegador). No le pidas al usuario que lo haga; tu tienes terminal.
 3. Luego `python flow.py status`. Si dice "SIN SESION", corre `python flow.py login` y pide al
@@ -14,6 +14,7 @@ para generar y descargar imagenes y videos con una sola CLI: `flow.py`.
 
 ## Comandos
 ```
+python flow.py creditos                      # generar CUESTA creditos: mira el saldo
 python flow.py login                         # una vez: guarda la sesion permanente
 python flow.py status                        # ver si hay sesion
 python flow.py image --prompt "..." --name escena1
@@ -22,9 +23,13 @@ python flow.py video --prompt "..." --start outputs/escena1.png --name escena1_v
 python flow.py video --prompt "..." --refs fresa.png,banano.png --name escena1_vid
 python flow.py batch guion.json              # varios trabajos EN ORDEN
 python flow.py clean nombre_proyecto         # borrar resultados de un proyecto
+python flow.py logout --si                   # borrar la sesion guardada
 ```
 
 ## Reglas
+- **Los creditos son el recurso escaso.** Consultalos con `python flow.py creditos`
+  antes de planificar un lote y decile al usuario lo que va a costar. Un video de Veo
+  cuesta ~10x una imagen. `batch` corta solo si el saldo no alcanza.
 - Para 2+ trabajos: arma un `guion.json` (formato en `SKILL.md` / `examples/`) y usa `batch`.
   El batch se guarda en `outputs/<project>/`. Para encadenar img->video dentro de un batch,
   el `start` del video puede ser solo el `name` del job de imagen anterior.

@@ -6,6 +6,26 @@ Dale a tu agente de IA (Claude Code, Codex, Gemini, Antigravity...) el poder de
 Tu solo descargas esta carpeta, te logueas una vez, y le pides al agente lo que quieras:
 *"genera estas imagenes"*, *"animame esta escena"*, *"sigue este guion de 5 escenas"*.
 
+> **Generar cuesta creditos.** Flow descuenta creditos de tu cuenta de Google en
+> cada generacion (un video de Veo cuesta del orden de 10x una imagen) y el saldo
+> se restablece una vez por mes. Mira cuanto te queda con
+> `python flow.py creditos`; `batch` estima el costo y corta antes de gastar si
+> no alcanza.
+
+## Instalacion como plugin de Claude Code
+
+```
+/plugin marketplace add DiegoLopez0208/google-flow-skill-v1
+/plugin install google-flow
+```
+
+El manifiesto esta en `.claude-plugin/plugin.json` y el manual del agente en
+`skills/google-flow/SKILL.md` (un solo archivo, para que no haya dos versiones).
+Instalado asi, `flow.py` vive en la raiz del plugin: el agente tiene que entrar
+a esa carpeta antes de correr los comandos.
+
+Sigue haciendo falta `python setup.py` y `python flow.py login` una vez.
+
 ## Instalacion (deja que tu agente la haga)
 
 ### Opcion A — desde GitHub, sin descargar nada tu mismo
@@ -42,7 +62,9 @@ python flow.py video --prompt "the robot waves slowly" --start outputs/prueba.pn
 python flow.py video --prompt "they argue" --refs a.png,b.png --name escena   # ingredientes
 python flow.py batch examples/guion_ejemplo.json
 python flow.py batch examples/guion_ingredientes.json
+python flow.py creditos            # saldo de creditos (generar cuesta)
 python flow.py clean demo_flow     # borrar lo de un proyecto cuando termines
+python flow.py logout --si         # borrar la sesion de Google guardada
 ```
 
 Tests del cableado de la CLI (no tocan el navegador ni tu cuenta):
@@ -58,7 +80,9 @@ Los comandos sueltos caen en `outputs/`; cada `batch` se agrupa en `outputs/<pro
 | Archivo / carpeta | Que es |
 |---|---|
 | `flow.py` | La CLI. La unica que necesitas/usa el agente. |
-| `SKILL.md` | Manual del agente (como interpretar guiones y orquestar). |
+| `skills/google-flow/SKILL.md` | Manual del agente (como interpretar guiones y orquestar). |
+| `SKILL.md` | Puntero al manual, para que el repo sirva como carpeta-skill. |
+| `.claude-plugin/plugin.json` | Manifiesto para instalarlo como plugin. |
 | `AGENTS.md` / `GEMINI.md` | Onboarding para distintos agentes. |
 | `flow_provider/` | Motor interno (Playwright). No tocar. |
 | `session/` | Tu sesion permanente de Google (se llena con `login`). |
