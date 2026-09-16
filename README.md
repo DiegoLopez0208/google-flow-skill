@@ -92,6 +92,29 @@ portado y verificado contra la UI actual:
 | `--start` / `--end` (fotogramas) | **No portado**: la UI ya no tiene esas ranuras |
 | Descarga | Funciona, con recuperacion automatica (ver abajo) |
 
+### Descarga por API, sin navegador
+
+Flow habla `batchexecute`, el RPC de siempre de Google, igual que NotebookLM.
+Mapeado el 2026-09-16:
+
+| RPC | Que hace |
+|---|---|
+| `jHPbke` | crear proyecto |
+| `ngNC2` | listar el contenido de un proyecto |
+| `as29s` | datos de un asset, incluida la URL del archivo original |
+| `ogiZ0b` | generar (payload de ~5 KB, todavia no replicado) |
+
+`flow_provider/api.py` implementa el cliente: cookies + el token `SNlM0e`, mas
+`f.sid` y `bl` del HTML. Detalle que cuesta encontrar: hay que mandar **solo**
+las cookies de `google.com` y `flow.google.com`; si van tambien las de
+`accounts.google.com`, Google contesta 401 a las escrituras (las lecturas pasan
+igual, lo que despista).
+
+La CLI baja los resultados por HTTP y deja el navegador como respaldo. Eso
+esquiva el bug de abajo, que estaba justo en la descarga por menu.
+
+Falta por replicar `ogiZ0b` para generar sin navegador.
+
 **Chrome se cae en algunas descargas.** Es un crash del propio navegador, no de
 Playwright: el perfil queda marcado como `Crashed`. Se mitigo desactivando la
 GPU y la verificacion de descargas de Safe Browsing, y saneando el perfil en

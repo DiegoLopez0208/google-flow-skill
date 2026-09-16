@@ -18,6 +18,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import flow as cli
+from flow_provider import api as api_real
 from flow_provider import registry
 
 
@@ -109,18 +110,36 @@ class FakeFlow:
         return [c for c in self.calls if c[0] == name]
 
 
+class FakeApi:
+    """API muda: los tests del cableado no deben salir a la red."""
+
+    SesionExpirada = api_real.SesionExpirada
+
+    def listar_assets(self, project_uuid, sesion=None):
+        raise RuntimeError("sin API en los tests")
+
+    def cargar_sesion(self):
+        return None
+
+    async def exportar_desde_pagina(self, page):
+        return None
+
+
 class BatchWiringTest(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.TemporaryDirectory()
         self.out = Path(self.tmp.name) / "outputs"
         self.fake = FakeFlow()
         self._real_flow = cli.flow
+        self._real_api = cli.api
         cli.flow = self.fake
+        cli.api = FakeApi()
         cli.session_exists = lambda: True
         registry.clear()
 
     def tearDown(self):
         cli.flow = self._real_flow
+        cli.api = self._real_api
         self.tmp.cleanup()
 
     def _run_batch(self, data):

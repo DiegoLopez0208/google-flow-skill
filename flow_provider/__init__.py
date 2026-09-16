@@ -15,6 +15,7 @@ La API util es esta, y la orquestacion vive en flow.py:
     wait_for_new_assets           espera los UUIDs nuevos
     download_assets               los baja por UUID
 """
+from . import api
 from .browser import (
     navegador_vivo,
     startup,
@@ -46,6 +47,7 @@ from .download import (
 )
 
 __all__ = [
+    "api",
     "startup", "shutdown", "get_page", "get_lock", "navegador_vivo",
     "create_project", "navigate_to_project",
     "select_image_mode", "select_video_mode",

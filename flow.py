@@ -55,7 +55,7 @@ from pathlib import Path
 from playwright.async_api import async_playwright
 
 import flow_provider as flow
-from flow_provider import registry, settings
+from flow_provider import api, registry, settings
 from flow_provider.configure import SEL_COUNT, SEL_MODEL_IMG, SEL_MODEL_VID, SEL_RATIO
 
 # Consola UTF-8 en Windows (acentos/emojis sin romper la salida).
@@ -184,6 +184,11 @@ _POSICIONES: dict[str, int] = {}
 async def _abrir_proyecto() -> None:
     uuid, _url = await flow.create_project()
     _PROYECTO["uuid"] = uuid
+    # La sesion de API sale de la misma pagina: no cuesta un navegador extra.
+    try:
+        await api.exportar_desde_pagina(await flow.get_page())
+    except Exception:
+        pass
 
 
 async def _relanzar_navegador() -> None:
@@ -210,6 +215,68 @@ async def _asegurar_navegador() -> None:
 def _es_navegador_caido(e: Exception) -> bool:
     texto = str(e).lower()
     return "closed" in texto or "crash" in texto or "disconnected" in texto
+
+
+async def _descargar_por_api(previos_api, out_path, esperados):
+    """Baja los assets nuevos por HTTP. Devuelve los paths, o None si no aplica.
+
+    Es el camino preferido: la descarga por menu del navegador es justo donde
+    Chrome se cae.
+    """
+    proyecto = _PROYECTO["uuid"]
+    if not proyecto or previos_api is None:
+        print("  sin inventario previo por API; uso el navegador")
+        return None
+    try:
+        sesion = api.cargar_sesion()
+        # El backend tarda unos segundos en indexar lo recien generado.
+        nuevos = []
+        for espera in (0, 3, 5, 8):
+            if espera:
+                await asyncio.sleep(espera)
+            nuevos = [u for u in api.listar_assets(proyecto, sesion) if u not in previos_api]
+            if nuevos:
+                break
+        if not nuevos:
+            print("  la API todavia no ve el resultado; uso el navegador")
+            return None
+        nuevos = nuevos[:esperados]
+        print(f"  descarga por API ({len(nuevos)} archivo(s), sin navegador)")
+        base = Path(out_path)
+        salidas = []
+        for i, uuid in enumerate(nuevos, 1):
+            destino = base if len(nuevos) == 1 else base.with_name(f"{base.stem}_{i}{base.suffix}")
+            salidas.append(api.descargar(uuid, str(destino), sesion))
+        return salidas
+    except Exception as e:
+        print(f"  la descarga por API no salio ({type(e).__name__}); uso el navegador")
+        return None
+
+
+async def _assets_api() -> set | None:
+    """UUIDs actuales del proyecto segun la API. None si la API no esta lista.
+
+    Si la sesion caduco se refresca desde la pagina que ya esta abierta.
+    """
+    proyecto = _PROYECTO["uuid"]
+    if not proyecto:
+        return None
+    for intento in range(2):
+        try:
+            return set(api.listar_assets(proyecto))
+        except api.SesionExpirada:
+            if intento == 0:
+                print("  la sesion de API caduco; la refresco")
+                try:
+                    if await api.exportar_desde_pagina(await flow.get_page()):
+                        continue
+                except Exception:
+                    pass
+            return None
+        except Exception as e:
+            print(f"  la API no respondio ({type(e).__name__}); sigo con el navegador")
+            return None
+    return None
 
 
 async def _descargar(nuevos, out_path, resolution):
@@ -325,12 +392,14 @@ async def _gen_image(prompt, ratio, model, count, refs, out_path,
     if refs:
         await _attach_refs(refs)
     previos = await flow.snapshot_assets()
+    previos_api = await _assets_api()
     await flow.submit_prompt(prompt)
     nuevos = await flow.wait_for_new_assets(previos, esperados=count,
                                             is_video=False, timeout_ms=240_000)
     if label and nuevos:
         await _registrar(label, nuevos[0])
-    return await _descargar(nuevos, out_path, resolution)
+    saved = await _descargar_por_api(previos_api, out_path, count)
+    return saved if saved else await _descargar(nuevos, out_path, resolution)
 
 
 async def _gen_video(prompt, ratio, model, count, start, end, refs, out_path,
@@ -342,12 +411,14 @@ async def _gen_video(prompt, ratio, model, count, start, end, refs, out_path,
     if refs:
         await _attach_refs(refs)
     previos = await flow.snapshot_assets()
+    previos_api = await _assets_api()
     await flow.submit_prompt(prompt)
     nuevos = await flow.wait_for_new_assets(previos, esperados=count,
                                             is_video=True, timeout_ms=600_000)
     if label and nuevos:
         await _registrar(label, nuevos[0])
-    return await _descargar(nuevos, out_path, resolution)
+    saved = await _descargar_por_api(previos_api, out_path, count)
+    return saved if saved else await _descargar(nuevos, out_path, resolution)
 
 
 def _split_refs(value):
