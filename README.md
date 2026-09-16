@@ -99,8 +99,15 @@ One-off commands land in `outputs/`; each `batch` is grouped into
   on that. Selector strings like `"Descargar"` or `"créditos"` are Flow's own UI
   text, not leftovers from translation.
 
-> **Warning:** automating Flow goes against Google's Terms of Service. The
-> account you use may be suspended. Use a secondary account, not your main one.
+> **On Terms of Service:** automating Flow goes against Google's ToS, like any
+> other tool in this family (`notebooklm-py` and friends do the same thing over
+> the same RPC). There are no reports of accounts being banned over it, so the
+> realistic risk is low. Two things are specific to Flow, though: it runs
+> reCAPTCHA Enterprise on the generation path and answers
+> `PUBLIC_ERROR_UNUSUAL_ACTIVITY` when it does not like a request, so there *is*
+> active detection here; and generating spends paid credits, which gives Google
+> more reason to care than a read-only tool would. A secondary account is the
+> cautious choice, not a required one.
 
 ## What this fork changes
 
