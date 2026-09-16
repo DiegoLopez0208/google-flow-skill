@@ -105,6 +105,7 @@ One-off commands land in `outputs/`; each `batch` is grouped into
 ## What this fork changes
 
 Fork of [BRPLia/google-flow-skill-v1](https://github.com/BRPLia/google-flow-skill-v1).
+Per-release detail lives in [CHANGELOG.md](CHANGELOG.md).
 
 ### Port to Flow's new UI (2026-09-16)
 

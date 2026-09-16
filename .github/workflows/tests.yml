@@ -1,0 +1,35 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  wiring-tests:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.12", "3.13"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      # Only the Python packages. The tests never open a browser, so there is no
+      # need for `playwright install` here.
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Byte-compile everything
+        run: python -m compileall -q flow.py setup.py flow_provider tests
+
+      # These cover the CLI wiring: batch ordering, references, credit budget,
+      # crash recovery and download URL selection. They never touch the network
+      # or a real Flow account.
+      - name: Run the wiring tests
+        run: python -m unittest discover -s tests -v
