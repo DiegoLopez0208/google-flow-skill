@@ -1,143 +1,146 @@
 """
-Espera de resultados de generación en Google Flow.
+Espera de resultados de generacion en Google Flow.
 
-Flow tiene 3 fases post-submit para imágenes:
-  Fase 1: card con blur + contador % (6 → 99)
-  Fase 2: reveal animation ~5s — img aparece pero toolbar NO interactivo
-  Fase 3: imagen lista — toolbar (more_vert) visible al hover
+UI nueva (mapeada 2026-09-16): cada resultado es un <flow-tile-container> con
+un <img class="thumbnail"> cuyo src apunta a flow-content.google/image/<uuid>
+o /video/<uuid>. Mientras genera, el tile muestra un porcentaje.
 
-Incluye detección de errores de generación ("No se pudo generar") con retry automático.
+La identificacion es por UUID de asset, no por posicion: asi no importa si Flow
+antepone o agrega al final, ni cuantas variantes devuelva.
 """
-import asyncio
 from .browser import get_page
 
-SEL_RESULT_IMAGE = 'img[alt="Imagen generada"]'
-SEL_RESULT_CARD  = '[aria-roledescription="draggable"]'
-SEL_MORE_MENU    = '[aria-roledescription="draggable"] button:has(i:text-is("more_vert"))'
+SEL_TILE = "flow-tile-container"
+SEL_THUMB = "img.thumbnail"
+POLL_MS = 2000
 
-# Selectores de error de generación — usar texto literal para evitar falsos positivos
-# con cards de loading que también tienen data-tile-id
-SEL_ERROR_TEXT = ':text("No se pudo generar")'
-SEL_RETRY_BTN  = 'button:has(i:text-is("refresh"))'
+SEL_ERROR_TEXT = (
+    ':text("No se pudo generar"), '
+    ':text("Error al generar"), '
+    ':text("Could not generate")'
+)
+SEL_RETRY_BTN = 'button[aria-label*="eintentar"], button:has-text("refresh")'
 
-
-async def _handle_generation_error(page, max_retries: int, attempt: int) -> bool:
-    """Detecta card de error y clicka Reintentar. Retorna True si reintentó."""
-    error_card = page.locator(SEL_ERROR_TEXT)
-    if await error_card.count() == 0:
-        return False
-
-    if attempt >= max_retries:
-        raise Exception(
-            f"Generación falló {max_retries + 1} veces consecutivas. "
-            "Flow reporta: 'No se pudo generar'."
-        )
-
-    print(f"  ⚠️  Error de generación detectado (intento {attempt + 1}/{max_retries + 1}). Reintentando...")
-    retry_btn = page.locator('[data-tile-id] ' + SEL_RETRY_BTN)
-    if await retry_btn.count() > 0:
-        await retry_btn.first.click()
-        await page.wait_for_timeout(3000)
-        # Esperar que el card de error desaparezca antes de re-poll
-        try:
-            await error_card.first.wait_for(state="hidden", timeout=10_000)
-        except Exception:
-            pass
-        return True
-
-    # Si no hay botón retry, no crashear — puede ser falso positivo transiente
-    print("  ⚠️  Texto de error detectado pero sin botón Reintentar. Continuando espera...")
-    return False
+JS_ASSETS = """() => {
+  // Las imagenes son flow-image-tile > img.image con src flow.google.com/asb/<token>
+  // (sin UUID). Los videos son flow-video-tile > img.thumbnail con /video/<uuid>.
+  // La identidad comun que sirve para ambos es el src.
+  const out = [];
+  for (const tile of document.querySelectorAll('flow-tile-container')) {
+    const m = tile.querySelector('img.image, img.thumbnail, img');
+    if (!m) continue;
+    const src = m.src || '';
+    if (!src) continue;
+    const esVideo = !!tile.querySelector('flow-video-tile') || src.includes('/video/');
+    out.push({id: src, tipo: esVideo ? 'video' : 'image',
+              listo: m.complete && m.naturalWidth > 0});
+  }
+  return out;
+}"""
+JS_PROGRESO = """() => {
+  const tiles = document.querySelectorAll('flow-tile-container');
+  let enCurso = 0;
+  for (const t of tiles) {
+    if ((t.innerText || '').includes('%')) enCurso++;
+  }
+  return {tiles: tiles.length, enCurso: enCurso};
+}"""
 
 
-async def wait_for_image(timeout_ms: int = 90000, max_retries: int = 2, pre_submit_count: int | None = None) -> None:
-    """Espera que la imagen sea generada y que el toolbar esté listo. Reintenta si Flow falla."""
+async def snapshot_assets() -> list[dict]:
+    """Assets presentes ahora mismo: [{id, tipo, listo}, ...]. El id es el src."""
     page = await get_page()
-
-    success_loc = page.locator(SEL_RESULT_IMAGE)
-    error_loc   = page.locator(SEL_ERROR_TEXT)
-    race        = success_loc.or_(error_loc)
-
-    for attempt in range(max_retries + 1):
-        try:
-            await race.first.wait_for(state="visible", timeout=timeout_ms)
-        except Exception:
-            raise TimeoutError(f"Generación de imagen no completó en {timeout_ms // 1000}s")
-
-        # ¿Error de generación?
-        if await error_loc.count() > 0 and await success_loc.count() == 0:
-            if await _handle_generation_error(page, max_retries, attempt):
-                continue
-        break
-
-    # Confirmar carga según estrategia:
-    if pre_submit_count is not None:
-        # Modo estricto: esperar que la cantidad de cards sea MAYOR que el baseline
-        await page.wait_for_function(
-            f"""() => {{
-                const cards = document.querySelectorAll('[aria-roledescription="draggable"]');
-                if (cards.length <= {pre_submit_count}) return false;
-                // La más reciente es la índice 0
-                const img = cards[0].querySelector('img[alt="Imagen generada"]');
-                return img && img.complete && img.naturalWidth > 0;
-            }}""",
-            timeout=timeout_ms
-        )
-    else:
-        # Confirmar que la imagen general esté cargada
-        await page.wait_for_function(
-            """() => {
-                const img = document.querySelector('img[alt="Imagen generada"]');
-                return img && img.complete && img.naturalWidth > 0;
-            }""",
-            timeout=timeout_ms
-        )
-    # Hover omitido para evitar apertura accidental de visualizadores a pantalla completa
-    return
+    return await page.evaluate(JS_ASSETS)
 
 
-async def wait_for_video(timeout_ms: int = 360000, max_retries: int = 2, pre_submit_count: int | None = None) -> None:
-    """Espera que el video sea generado. Reintenta si Flow falla. Default 6 min."""
-    page = await get_page()
-
-    success_loc = page.locator('img[alt="Miniatura de video"]')
-    error_loc   = page.locator(SEL_ERROR_TEXT)
-    race        = success_loc.or_(error_loc)
-
-    for attempt in range(max_retries + 1):
-        try:
-            await race.first.wait_for(state="visible", timeout=timeout_ms)
-        except Exception:
-            raise TimeoutError(f"Generación de video no completó en {timeout_ms // 1000}s")
-
-        if await error_loc.count() > 0 and await success_loc.count() == 0:
-            if await _handle_generation_error(page, max_retries, attempt):
-                continue
-        break
-
-    if pre_submit_count is not None:
-        await page.wait_for_function(
-            f"""() => {{
-                const cards = document.querySelectorAll('[aria-roledescription="draggable"]');
-                if (cards.length <= {pre_submit_count}) return false;
-                const thumb = cards[0].querySelector('img[alt="Miniatura de video"]');
-                return !!thumb;
-            }}""",
-            timeout=timeout_ms
-        )
-
-    # Confirmar carga de video (readyState >= 2)
+async def _contar_errores(page) -> int:
     try:
-        await page.wait_for_function(
-            """() => {
-                const card = document.querySelector('[aria-roledescription="draggable"]');
-                const vid = card ? card.querySelector('video') : document.querySelector('video');
-                if (!vid) return false;
-                return vid.readyState >= 2 || (vid.src && vid.src.length > 0);
-            }""",
-            timeout=80000
-        )
+        return await page.locator(SEL_ERROR_TEXT).count()
     except Exception:
-        pass  # Fallback: flow a veces renderiza miniatura y oculta src
-    # Hover omitido para evitar apertura accidental de visualizadores a pantalla completa
-    return
+        return 0
+
+
+async def wait_for_new_assets(
+    previos: list[dict],
+    esperados: int = 1,
+    is_video: bool = False,
+    timeout_ms: int = 360_000,
+    max_retries: int = 2,
+) -> list[dict]:
+    """Espera assets nuevos respecto de 'previos'. Devuelve los nuevos y listos.
+
+    Corta apenas hay al menos 'esperados' assets nuevos cargados, o devuelve lo
+    que consiguio cuando ya no queda nada generandose.
+    """
+    page = await get_page()
+    antes = {a["id"] for a in previos}
+    tipo = "video" if is_video else "image"
+    errores_base = await _contar_errores(page)
+
+    for intento in range(max_retries + 1):
+        transcurrido = 0
+        while transcurrido < timeout_ms:
+            actuales = await snapshot_assets()
+            nuevos = [a for a in actuales if a["id"] not in antes and a["listo"]]
+            # Flow etiqueta algunos resultados como miniatura de video aunque
+            # sean imagen; si no hay coincidencia de tipo se aceptan todos.
+            del_tipo = [a for a in nuevos if a["tipo"] == tipo] or nuevos
+            if len(del_tipo) >= esperados:
+                return del_tipo[:esperados]
+
+            prog = await page.evaluate(JS_PROGRESO)
+            if del_tipo and prog["enCurso"] == 0:
+                return del_tipo  # termino con menos de los pedidos
+
+            if await _contar_errores(page) > errores_base:
+                if intento >= max_retries:
+                    raise RuntimeError(
+                        f"La generacion fallo {max_retries + 1} veces seguidas. "
+                        "Flow reporta un error de generacion."
+                    )
+                print(f"  Error de generacion (intento {intento + 1}/{max_retries + 1}). Reintentando...")
+                btn = page.locator(SEL_RETRY_BTN)
+                if await btn.count():
+                    await btn.first.click()
+                    await page.wait_for_timeout(3000)
+                    break
+                errores_base = await _contar_errores(page)
+
+            await page.wait_for_timeout(POLL_MS)
+            transcurrido += POLL_MS
+        else:
+            prog = await page.evaluate(JS_PROGRESO)
+            raise TimeoutError(
+                f"La generacion no completo en {timeout_ms // 1000}s "
+                f"(tiles en curso: {prog['enCurso']})"
+            )
+
+    raise TimeoutError(f"La generacion no completo tras {max_retries + 1} intentos")
+
+
+async def get_canvas_count() -> int:
+    """Cantidad de tiles en el canvas."""
+    page = await get_page()
+    return await page.locator(SEL_TILE).count()
+
+
+async def _esperar_sin_progreso(timeout_ms: int) -> None:
+    page = await get_page()
+    transcurrido = 0
+    while transcurrido < timeout_ms:
+        prog = await page.evaluate(JS_PROGRESO)
+        if prog["tiles"] and prog["enCurso"] == 0:
+            return
+        await page.wait_for_timeout(POLL_MS)
+        transcurrido += POLL_MS
+    raise TimeoutError(f"La generacion no completo en {timeout_ms // 1000}s")
+
+
+async def wait_for_image(timeout_ms: int = 180_000, max_retries: int = 2, pre_submit_count=None) -> None:
+    """Compatibilidad: espera a que no quede nada generandose."""
+    await _esperar_sin_progreso(timeout_ms)
+
+
+async def wait_for_video(timeout_ms: int = 420_000, max_retries: int = 2, pre_submit_count=None) -> None:
+    """Compatibilidad: espera a que no quede nada generandose."""
+    await _esperar_sin_progreso(timeout_ms)

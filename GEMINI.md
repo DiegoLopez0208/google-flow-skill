@@ -19,6 +19,7 @@ python flow.py status
 python flow.py image --prompt "DESCRIPCION VISUAL EN INGLES" --name escena1
 python flow.py video --prompt "MOVIMIENTO/ACCION EN INGLES" --name escena1
 python flow.py video --prompt "..." --start outputs/escena1.png --name escena1_vid
+python flow.py video --prompt "..." --refs fresa.png,banano.png --name escena1_vid
 python flow.py batch guion.json
 python flow.py clean nombre_proyecto
 ```
@@ -27,7 +28,10 @@ python flow.py clean nombre_proyecto
 - El usuario te pasa una lista de prompts o un guion con escenas. Separa cada escena.
 - En cada escena: si hay prompt de imagen Y de video -> primero imagen, luego anima esa
   imagen como `--start` del video. Si solo hay uno, haz solo ese.
-- La narracion/voz NO se manda a Flow.
+- La narracion/voz NO se manda a Flow. (Ojo: Veo 3.1 genera audio, asi que el DIALOGO
+  hablado SI va dentro del prompt de video. Lo que no va es la narracion de guion.)
+- Personajes que se repiten entre escenas: generalos una vez como imagen y pasalos como
+  `refs` (ingredientes) en cada video; dentro de un batch alcanza con el `name` del job.
 - Para varias escenas: escribe un `guion.json` (ver `examples/guion_ejemplo.json`) y usa `batch`.
   El batch se guarda en `outputs/<project>/`. Para encadenar, el `start` del video puede ser
   solo el `name` del job de imagen anterior (la CLI lo resuelve sola).

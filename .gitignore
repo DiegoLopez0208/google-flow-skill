@@ -1,6 +1,8 @@
 # Python
 __pycache__/
 *.pyc
+.venv/
+venv/
 
 # Variables de entorno (por si alguien agrega una .env)
 .env
@@ -16,3 +18,12 @@ session/*
 !session/LEEME.txt
 outputs/*
 !outputs/LEEME.txt
+
+# Scratch de diagnostico de selectores
+_diag*
+_map*
+_tmp_*
+_p1_*.png
+_p2_*.png
+_p3_*.png
+_prueba_*.json

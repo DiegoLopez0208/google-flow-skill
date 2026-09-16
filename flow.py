@@ -16,18 +16,27 @@ Comandos
       Dice si ya hay sesion guardada.
 
   python flow.py image --prompt "..." [--ratio 9:16] [--model "Nano Banana 2"]
-                        [--image referencia.png] [--name escena1] [--out outputs]
-      Genera UNA imagen (texto->imagen, o imagen+prompt->imagen si das --image).
+                        [--image referencia.png] [--refs a.png,b.png]
+                        [--count 1-4] [--res 1K|2K|4K]
+                        [--name escena1] [--out outputs]
+      Genera imagenes (texto->imagen, o con referencias si das --image/--refs).
+      Con --count N baja las N variantes como <name>_1..<name>_N.
 
   python flow.py video --prompt "..." [--ratio 9:16] [--model "Veo 3.1 - Lite"]
                         [--start frame.png] [--end frame_final.png]
+                        [--refs personaje.png,fondo.png]
+                        [--count 1-4] [--res 720p|1080p]
                         [--name escena1] [--out outputs]
-      Genera UN video. Sin --start = texto->video. Con --start = anima esa
-      imagen. Con --start y --end = interpola inicio->fin.
+      Genera video. Sin --start = texto->video. Con --start = anima esa imagen.
+      Con --start y --end = interpola inicio->fin. Con --refs = modo
+      Ingredientes: las referencias guian el video (util para mantener un
+      personaje entre escenas).
 
   python flow.py batch guion.json [--out outputs]
       Ejecuta una lista de trabajos EN ORDEN dentro de UN solo proyecto Flow.
-      Ver examples/guion_ejemplo.json para el formato.
+      Dentro de un batch, un job puede referenciar a otro por su "name":
+      como fotograma ("start") o como ingrediente ("refs"). Ver
+      examples/guion_ejemplo.json y examples/guion_ingredientes.json.
 
 Modelos validos
 ---------------
@@ -46,7 +55,8 @@ from pathlib import Path
 from playwright.async_api import async_playwright
 
 import flow_provider as flow
-from flow_provider import settings
+from flow_provider import registry, settings
+from flow_provider.configure import SEL_COUNT, SEL_MODEL_IMG, SEL_MODEL_VID, SEL_RATIO
 
 # Consola UTF-8 en Windows (acentos/emojis sin romper la salida).
 if hasattr(sys.stdout, "reconfigure"):
@@ -162,36 +172,189 @@ async def cmd_status(_args) -> int:
 # ---------------------------------------------------------------------------
 # Generadores atomicos (asumen proyecto YA abierto)
 # ---------------------------------------------------------------------------
-async def _gen_image(prompt, ratio, model, count, image, out_path) -> str:
+# Proyecto Flow de la corrida actual. Se necesita para volver a entrar si hay
+# que relanzar el navegador a mitad de camino.
+_PROYECTO = {"uuid": None}
+
+# El src de un asset lleva un token que vence: al recargar el proyecto cambia.
+# Se guarda ademas su posicion en el canvas para poder reubicarlo.
+_POSICIONES: dict[str, int] = {}
+
+
+async def _abrir_proyecto() -> None:
+    uuid, _url = await flow.create_project()
+    _PROYECTO["uuid"] = uuid
+
+
+async def _relanzar_navegador() -> None:
+    """Cierra y vuelve a abrir el navegador sobre el mismo proyecto."""
+    try:
+        await flow.shutdown()
+    except Exception:
+        pass
+    await flow.startup()
+    if _PROYECTO["uuid"]:
+        await flow.navigate_to_project(_PROYECTO["uuid"])
+
+
+async def _asegurar_navegador() -> None:
+    """Si el navegador se cayo en el job anterior, lo levanta de nuevo.
+
+    Sin esto, una caida en el primer job arrastraba a todos los demas del batch.
+    """
+    if not flow.navegador_vivo():
+        print("  el navegador no esta en pie; lo reabro")
+        await _relanzar_navegador()
+
+
+def _es_navegador_caido(e: Exception) -> bool:
+    texto = str(e).lower()
+    return "closed" in texto or "crash" in texto or "disconnected" in texto
+
+
+async def _descargar(nuevos, out_path, resolution):
+    """Descarga los assets recien generados, sobreviviendo a una caida de Chrome.
+
+    Al recargar el proyecto los src cambian (llevan un token con vencimiento),
+    asi que para reintentar se guarda tambien la posicion de cada asset.
+    """
+    todos = await flow.snapshot_assets()
+    posicion = {a["id"]: i for i, a in enumerate(todos)}
+    indices = [posicion.get(a["id"]) for a in nuevos]
+
+    ids = [a["id"] for a in nuevos]
+    ultimo: Exception | None = None
+    for intento in range(3):
+        try:
+            return await flow.download_assets(ids, out_path, resolution=resolution)
+        except Exception as e:
+            if not _es_navegador_caido(e):
+                raise
+            ultimo = e
+            print(f"  el navegador se cayo durante la descarga "
+                  f"(intento {intento + 1}/3); reabro y reintento")
+            await _relanzar_navegador()
+            todos = await flow.snapshot_assets()
+            ids = [todos[i]["id"] for i in indices if i is not None and i < len(todos)]
+            if not ids:
+                raise RuntimeError(
+                    "El navegador se cayo durante la descarga y al reabrir no se "
+                    "pudo reubicar el resultado en el proyecto."
+                ) from e
+    raise RuntimeError(
+        "El navegador se cayo en las tres descargas. El resultado quedo generado "
+        "en el proyecto de Flow; se puede bajar a mano."
+    ) from ultimo
+
+
+async def _registrar(label: str, asset: dict) -> None:
+    """Guarda un asset bajo 'label', con su src y su posicion en el canvas."""
+    registry.capture_name(label, asset["id"])
+    todos = await flow.snapshot_assets()
+    for i, a in enumerate(todos):
+        if a["id"] == asset["id"]:
+            _POSICIONES[label] = i
+            break
+
+
+async def _resolver_asset(label: str) -> str | None:
+    """Devuelve el src actual del asset guardado como 'label'.
+
+    Si el proyecto se recargo, el src viejo ya no existe y se reubica por
+    posicion.
+    """
+    guardado = registry.get_all().get(label)
+    actuales = await flow.snapshot_assets()
+    if guardado and any(a["id"] == guardado for a in actuales):
+        return guardado
+    idx = _POSICIONES.get(label)
+    if idx is not None and idx < len(actuales):
+        vigente = actuales[idx]["id"]
+        registry.capture_name(label, vigente)
+        return vigente
+    return None
+
+
+async def _attach_refs(refs: list[str]) -> list[str]:
+    """Adjunta referencias al prompt, en orden. Devuelve sus UUIDs.
+
+    Cada ref puede ser:
+      - un archivo local  -> se sube al proyecto y se adjunta
+      - el "name" de un job anterior del mismo batch -> se reusa el asset que
+        ya vive en el proyecto Flow, desde el menu del propio resultado
+    """
+    known = registry.get_all()
+    uuids: list[str] = []
+    for ref in refs:
+        # Primero el registry: reusar el asset del proyecto sale mas barato y
+        # mas consistente que volver a subir el archivo.
+        label = ref if ref in known else Path(ref).stem
+        if label in known:
+            vigente = await _resolver_asset(label)
+            if vigente is None:
+                raise ValueError(
+                    f"La referencia '{ref}' se genero en este batch pero ya no se "
+                    "encuentra en el proyecto de Flow."
+                )
+            await flow.add_asset_to_prompt(vigente)
+            uuids.append(vigente)
+            continue
+        path = Path(ref)
+        if path.exists():
+            uuids.append(await flow.upload_media(str(path)))
+            continue
+        raise ValueError(
+            f"Referencia '{ref}': no es un archivo existente ni el nombre de un job "
+            "anterior de este batch. Las referencias por nombre solo funcionan dentro "
+            "de una misma corrida de 'batch'."
+        )
+    return uuids
+
+
+def _no_soportado_fotogramas():
+    raise ValueError(
+        "El modo Fotogramas (--start/--end) todavia no esta portado a la UI nueva "
+        "de Flow: el panel ya no tiene las ranuras Iniciar/Fin. Usa --refs para "
+        "guiar el video con imagenes de referencia."
+    )
+
+
+async def _gen_image(prompt, ratio, model, count, refs, out_path,
+                     resolution="1K", label=None) -> list[str]:
     await flow.select_image_mode(aspect_ratio=ratio, count=count, model=model)
-    if image:
-        await flow.upload_standalone_image(image)
-    pre = await flow.get_canvas_count()
+    if refs:
+        await _attach_refs(refs)
+    previos = await flow.snapshot_assets()
     await flow.submit_prompt(prompt)
-    await flow.wait_for_image(pre_submit_count=pre)
-    return await flow.download_latest(out_path, resolution="1K", is_video=False)
+    nuevos = await flow.wait_for_new_assets(previos, esperados=count,
+                                            is_video=False, timeout_ms=240_000)
+    if label and nuevos:
+        await _registrar(label, nuevos[0])
+    return await _descargar(nuevos, out_path, resolution)
 
 
-async def _gen_video(prompt, ratio, model, count, start, end, out_path) -> str:
-    if start and end:
-        await flow.select_video_mode(mode="fotogramas", model=model, aspect_ratio=ratio, count=count)
-        await flow.upload_frame(start, slot="initial")
-        await asyncio.sleep(3)
-        await flow.upload_frame(end, slot="final")
-    elif start:
-        await flow.select_video_mode(mode="fotogramas", model=model, aspect_ratio=ratio, count=count)
-        await flow.upload_frame(start, slot="initial")
-    else:
-        await flow.select_video_mode(mode="texto", model=model, aspect_ratio=ratio, count=count)
-    pre = await flow.get_canvas_count()
+async def _gen_video(prompt, ratio, model, count, start, end, refs, out_path,
+                     resolution="720p", label=None) -> list[str]:
+    if start or end:
+        _no_soportado_fotogramas()
+    await flow.select_video_mode(mode="ingredientes" if refs else "texto",
+                                 model=model, aspect_ratio=ratio, count=count)
+    if refs:
+        await _attach_refs(refs)
+    previos = await flow.snapshot_assets()
     await flow.submit_prompt(prompt)
-    await flow.wait_for_video(pre_submit_count=pre)
-    return await flow.download_latest(out_path, resolution="720p", is_video=True)
+    nuevos = await flow.wait_for_new_assets(previos, esperados=count,
+                                            is_video=True, timeout_ms=600_000)
+    if label and nuevos:
+        await _registrar(label, nuevos[0])
+    return await _descargar(nuevos, out_path, resolution)
 
 
-# ---------------------------------------------------------------------------
-# Comandos de generacion
-# ---------------------------------------------------------------------------
+def _split_refs(value):
+    if not value:
+        return []
+    return [r.strip() for r in value.split(",") if r.strip()]
+
 async def cmd_image(args) -> int:
     if not session_exists():
         print("SIN SESION. Corre primero: python flow.py login")
@@ -199,11 +362,14 @@ async def cmd_image(args) -> int:
     out_dir = Path(args.out)
     name = args.name or f"imagen_{_stamp()}"
     out_path = _out_path(out_dir, name, "png")
+    refs = _split_refs(args.refs) or ([args.image] if args.image else [])
     await flow.startup()
     try:
-        await flow.create_project()
-        saved = await _gen_image(args.prompt, args.ratio, args.model, args.count, args.image, out_path)
-        print(f"OK imagen -> {saved}")
+        await _abrir_proyecto()
+        saved = await _gen_image(args.prompt, args.ratio, args.model, args.count, refs,
+                                 out_path, resolution=args.res, label=name)
+        for f in saved:
+            print(f"OK imagen -> {f}")
         return 0
     finally:
         await flow.shutdown()
@@ -216,11 +382,15 @@ async def cmd_video(args) -> int:
     out_dir = Path(args.out)
     name = args.name or f"video_{_stamp()}"
     out_path = _out_path(out_dir, name, "mp4")
+    refs = _split_refs(args.refs)
     await flow.startup()
     try:
-        await flow.create_project()
-        saved = await _gen_video(args.prompt, args.ratio, args.model, args.count, args.start, args.end, out_path)
-        print(f"OK video -> {saved}")
+        await _abrir_proyecto()
+        saved = await _gen_video(args.prompt, args.ratio, args.model, args.count,
+                                 args.start, args.end, refs, out_path,
+                                 resolution=args.res, label=name)
+        for f in saved:
+            print(f"OK video -> {f}")
         return 0
     finally:
         await flow.shutdown()
@@ -244,48 +414,68 @@ async def cmd_batch(args) -> int:
     project_dir.mkdir(parents=True, exist_ok=True)
 
     print(f"BATCH '{project}': {len(jobs)} trabajos. Salida -> {project_dir}")
-    results = []
+    results: list[dict] = []
+    report = project_dir / "batch_report.json"
+
+    # Los UUIDs registrados pertenecen a UN proyecto Flow. Cada batch abre uno
+    # nuevo, asi que arrancar con el registry limpio.
+    registry.clear()
+    _POSICIONES.clear()
+
     await flow.startup()
     try:
-        await flow.create_project()
+        await _abrir_proyecto()
         for i, job in enumerate(jobs, 1):
             jtype = job.get("type", "image")
             name = job.get("name") or f"{jtype}_{i:02d}"
             prompt = job.get("prompt", "")
             ratio = job.get("ratio", d_ratio)
+            count = int(job.get("count", 1))
+            refs = job.get("refs") or []
+            if isinstance(refs, str):
+                refs = _split_refs(refs)
             print(f"\n--- [{i}/{len(jobs)}] {jtype} :: {name} ---")
             try:
+                await _asegurar_navegador()
                 if jtype == "image":
+                    if not refs and job.get("image"):
+                        refs = [_resolve_asset(project_dir, job["image"])]
                     out_path = _out_path(project_dir, name, "png")
                     saved = await _gen_image(
-                        prompt, ratio, job.get("model", d_img_model),
-                        int(job.get("count", 1)),
-                        _resolve_asset(project_dir, job.get("image")), out_path,
+                        prompt, ratio, job.get("model", d_img_model), count, refs,
+                        out_path, resolution=job.get("res", "1K"), label=name,
                     )
                 elif jtype == "video":
                     out_path = _out_path(project_dir, name, "mp4")
                     saved = await _gen_video(
-                        prompt, ratio, job.get("model", d_vid_model),
-                        int(job.get("count", 1)),
+                        prompt, ratio, job.get("model", d_vid_model), count,
                         _resolve_asset(project_dir, job.get("start")),
-                        _resolve_asset(project_dir, job.get("end")), out_path,
+                        _resolve_asset(project_dir, job.get("end")), refs,
+                        out_path, resolution=job.get("res", "720p"), label=name,
                     )
                 else:
                     print(f"  tipo desconocido '{jtype}', saltando.")
+                    results.append({"name": name, "type": jtype, "ok": False,
+                                    "error": f"tipo desconocido '{jtype}'"})
                     continue
-                print(f"  OK -> {saved}")
-                results.append({"name": name, "type": jtype, "file": saved, "ok": True})
+                for f in saved:
+                    print(f"  OK -> {f}")
+                results.append({"name": name, "type": jtype, "files": saved, "ok": True})
             except Exception as e:
                 print(f"  ERROR en '{name}': {e}")
                 results.append({"name": name, "type": jtype, "ok": False, "error": str(e)})
+    except Exception as e:
+        # Fallo fuera de los jobs (ej. crear el proyecto). Se anota y se escribe
+        # el reporte igual: perderlo dejaba al agente a ciegas.
+        print(f"BATCH abortado: {e}")
+        results.append({"name": "__batch__", "type": "setup", "ok": False, "error": str(e)})
     finally:
         await flow.shutdown()
+        report.write_text(json.dumps(results, indent=2, ensure_ascii=False), encoding="utf-8")
 
-    report = project_dir / "batch_report.json"
-    report.write_text(json.dumps(results, indent=2, ensure_ascii=False), encoding="utf-8")
     ok = sum(1 for r in results if r.get("ok"))
     print(f"\nBATCH terminado: {ok}/{len(results)} OK. Carpeta: {project_dir}")
-    return 0 if ok == len(results) else 1
+    return 0 if results and ok == len(results) else 1
 
 
 async def cmd_clean(args) -> int:
@@ -326,20 +516,30 @@ def build_parser() -> argparse.ArgumentParser:
 
     pi = sub.add_parser("image", help="Generar una imagen.")
     pi.add_argument("--prompt", required=True)
-    pi.add_argument("--ratio", default="9:16")
-    pi.add_argument("--model", default="Nano Banana 2")
-    pi.add_argument("--count", type=int, default=1)
+    pi.add_argument("--ratio", default="9:16", choices=list(SEL_RATIO))
+    pi.add_argument("--model", default="Nano Banana 2", choices=list(SEL_MODEL_IMG))
+    pi.add_argument("--count", type=int, default=1, choices=list(SEL_COUNT))
     pi.add_argument("--image", default=None, help="Imagen de referencia para editar.")
+    pi.add_argument("--refs", default=None,
+                    help="Referencias separadas por coma: archivos locales y/o nombres de "
+                         "jobs anteriores del mismo batch (ingredientes).")
+    pi.add_argument("--res", default="1K", choices=["1K", "2K", "4K"],
+                    help="Resolucion de descarga.")
     pi.add_argument("--name", default=None)
     pi.add_argument("--out", default=str(DEFAULT_OUT))
 
     pv = sub.add_parser("video", help="Generar un video.")
     pv.add_argument("--prompt", required=True)
-    pv.add_argument("--ratio", default="9:16")
-    pv.add_argument("--model", default="Veo 3.1 - Lite")
-    pv.add_argument("--count", type=int, default=1)
+    pv.add_argument("--ratio", default="9:16", choices=list(SEL_RATIO))
+    pv.add_argument("--model", default="Veo 3.1 - Lite", choices=list(SEL_MODEL_VID))
+    pv.add_argument("--count", type=int, default=1, choices=list(SEL_COUNT))
     pv.add_argument("--start", default=None, help="Fotograma inicial (imagen).")
     pv.add_argument("--end", default=None, help="Fotograma final (imagen).")
+    pv.add_argument("--refs", default=None,
+                    help="Ingredientes separados por coma: archivos locales y/o nombres de "
+                         "jobs anteriores del mismo batch. Activa el modo Ingredientes.")
+    pv.add_argument("--res", default="720p", choices=["720p", "1080p", "4K"],
+                    help="Resolucion de descarga.")
     pv.add_argument("--name", default=None)
     pv.add_argument("--out", default=str(DEFAULT_OUT))
 

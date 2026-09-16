@@ -1,69 +1,136 @@
 """
-Selección de modo (IMAGE/VIDEO), aspect ratio, cantidad y modelo en el panel de Flow.
+Seleccion de modo (IMAGE/VIDEO), aspect ratio, cantidad y modelo.
+
+UI nueva de Flow (Angular Material, flow.google.com, mapeada 2026-09-16).
+Todo vive detras de UN boton de configuracion en la barra de instruccion:
+
+    flow-base-prompt-box button[aria-label*="onfiguraci"]
+      [role=radio] "image Imagen" / "videocam Video"
+      [role=radio] "crop_16_9 16:9" ... "crop_9_16 9:16"
+      [role=radio] "x1".."x4"
+      button[aria-label*="familia de modelos"] -> [role=menuitem] por nombre
+
+Los selectores se anclan al NOMBRE DEL ICONO (google-symbols: "image",
+"videocam", "crop_9_16"), que no se traduce. El texto en español queda solo
+como respaldo.
 """
-from .browser import get_page
+from .browser import cerrar_overlays, get_page
 
-# Selectores validados (DOM real, 2026-04-15)
-SEL_PANEL_TRIGGER = (
-    'button[aria-haspopup="menu"]:has-text("Video"), '
-    'button[aria-haspopup="menu"]:has-text("Nano Banana"), '
-    'button[aria-haspopup="menu"]:has-text("Imagen"), '
-    'button[aria-haspopup="menu"]:has-text("Veo")'
-)
+# Custom element de Angular: el scope mas estable que hay en esta UI.
+SEL_PROMPT_BOX = "flow-base-prompt-box"
+SEL_CONFIG_BTN = f'{SEL_PROMPT_BOX} button[aria-label*="onfiguraci"]'
+SEL_MODEL_BTN = 'button[aria-label*="familia de modelos"]'
 
-SEL_TAB_IMAGE       = '[id$="-trigger-IMAGE"]'
-SEL_TAB_VIDEO       = '[id$="-trigger-VIDEO"]'
-SEL_TAB_FRAMES      = '[id$="-trigger-VIDEO_FRAMES"]'
-SEL_TAB_INGREDIENTS = '[id$="-trigger-VIDEO_REFERENCES"]'
+# (nombre del icono, texto de respaldo)
+MODE_IMAGE = ("image", "Imagen")
+MODE_VIDEO = ("videocam", "Video")
 
 SEL_RATIO = {
-    "16:9": '[id$="-trigger-LANDSCAPE"]',
-    "4:3":  '[id$="-trigger-LANDSCAPE_4_3"]',
-    "1:1":  '[id$="-trigger-SQUARE"]',
-    "3:4":  '[id$="-trigger-PORTRAIT_3_4"]',
-    "9:16": '[id$="-trigger-PORTRAIT"]',
+    "16:9": ("crop_16_9", "16:9"),
+    "4:3": ("crop_landscape", "4:3"),
+    "1:1": ("crop_square", "1:1"),
+    "3:4": ("crop_portrait", "3:4"),
+    "9:16": ("crop_9_16", "9:16"),
 }
-SEL_COUNT = {i: f'[id$="-trigger-{i}"]' for i in range(1, 5)}
+SEL_COUNT = {i: (f"x{i}", f"x{i}") for i in range(1, 5)}
 
-SEL_MODEL_IMG = {
-    'Nano Banana Pro': '[role="menuitem"]:has-text("Nano Banana Pro")',
-    'Nano Banana 2':   '[role="menuitem"]:has-text("Nano Banana 2")',
-    'Imagen 4':        '[role="menuitem"]:has-text("Imagen 4")',
-}
-SEL_MODEL_VID = {
-    'Veo 3.1 - Lite':    '[role="menuitem"]:has-text("Veo 3.1 - Lite")',
-    'Veo 3.1 - Fast':    '[role="menuitem"]:has-text("Veo 3.1 - Fast")',
-    'Veo 3.1 - Quality': '[role="menuitem"]:has-text("Veo 3.1 - Quality")',
-    'Omni Flash':        '[role="menuitem"]:has-text("Omni Flash")',
-}
+MODELOS_IMAGEN = ["Nano Banana Pro", "Nano Banana 2", "Nano Banana 2 Lite"]
+MODELOS_VIDEO = ["Veo 3.1 - Quality", "Veo 3.1 - Fast", "Veo 3.1 - Lite", "Omni 1.1 Flash"]
+
+# Tablas para que flow.py valide en argparse sin duplicar los nombres.
+SEL_MODEL_IMG = {m: m for m in MODELOS_IMAGEN}
+SEL_MODEL_VID = {m: m for m in MODELOS_VIDEO}
 
 
-import re
+def _validate(value, table, label):
+    """Falla temprano ante un nombre invalido en vez de generar con otra cosa."""
+    if value not in table:
+        raise ValueError(f"{label} '{value}' no valido. Opciones: {list(table)}")
+    return table[value]
 
-async def _click_menu_option(page, sel_id: str, texts: list[str]) -> None:
-    """Intenta hacer click en una opción del menú por su selector de ID, y si falla o no es visible, busca por texto y rol."""
-    loc_id = page.locator(sel_id)
-    if await loc_id.count() > 0 and await loc_id.first.is_visible():
-        await loc_id.first.click()
-        return
-        
-    regex = re.compile("|".join(texts), re.IGNORECASE)
-    
-    # Intentar buscar por roles interactivos comunes y coincidencia de texto
-    for role in ["tab", "menuitem", "button"]:
-        loc_role = page.locator(f'[role="{role}"]').filter(has_text=regex)
-        if await loc_role.count() > 0 and await loc_role.first.is_visible():
-            await loc_role.first.click()
+
+async def _click_radio(page, opcion: tuple[str, str], etiqueta: str) -> None:
+    """Clickea un [role=radio] del panel, por icono y si no por texto."""
+    icono, texto = opcion
+    for termino in (icono, texto):
+        loc = page.locator(f'[role="radio"]:has-text("{termino}")')
+        if await loc.count() and await loc.first.is_visible():
+            await loc.first.click()
+            await page.wait_for_timeout(500)
             return
-            
-    # Fallback general de elementos que contengan el texto
-    loc_text = page.locator('button, [role="button"], span, div').filter(has_text=regex)
-    if await loc_text.count() > 0 and await loc_text.first.is_visible():
-        await loc_text.first.click()
-        return
-        
-    # Si todo falla, hacer click con el selector de ID para que Playwright arroje el error detallado
-    await loc_id.first.click()
+    raise RuntimeError(
+        f"No se encontro la opcion de {etiqueta} ('{icono}'/'{texto}') en el panel "
+        "de configuracion. La UI de Flow pudo cambiar."
+    )
+
+
+async def _abrir_panel(page) -> None:
+    """Abre el panel de configuracion y confirma que se pinto.
+
+    Esperar un tiempo fijo no alcanza: despues de una descarga el menu anterior
+    todavia puede estar cerrandose y el click cae sobre el overlay. Se reintenta
+    hasta ver los radios.
+    """
+    btn = page.locator(SEL_CONFIG_BTN)
+    if await btn.count() == 0:
+        raise RuntimeError(
+            "No se encontro el boton de configuracion de la barra de instruccion. "
+            "El proyecto pudo no haber terminado de cargar."
+        )
+
+    for _ in range(3):
+        await cerrar_overlays(page)
+        # Sacar el mouse de las tarjetas: el hotbar del hover tapa la barra.
+        await page.mouse.move(5, 5)
+        await page.wait_for_timeout(400)
+        await btn.first.click()
+        try:
+            await page.locator('[role="radio"]').first.wait_for(state="visible", timeout=5000)
+            return
+        except Exception:
+            await page.keyboard.press("Escape")
+            await page.wait_for_timeout(800)
+
+    raise RuntimeError(
+        "El panel de configuracion no llego a abrirse tras tres intentos."
+    )
+
+async def _cerrar_panel(page) -> None:
+    await cerrar_overlays(page)
+    await page.wait_for_timeout(500)
+
+
+async def _select_model(page, model: str) -> None:
+    """Abre el submenu de familia de modelos y elige por nombre."""
+    btn = page.locator(SEL_MODEL_BTN)
+    if await btn.count() == 0:
+        raise RuntimeError(f"No se encontro el selector de modelo para elegir '{model}'.")
+    await btn.first.click()
+    await page.wait_for_timeout(1500)
+
+    items = page.locator('[role="menuitem"]')
+    total = await items.count()
+    objetivo = None
+    # Los nombres se solapan: "Nano Banana 2" tambien esta dentro de
+    # "Nano Banana 2 Lite". Se busca coincidencia exacta del texto final.
+    for i in range(total):
+        txt = (await items.nth(i).inner_text()).strip().splitlines()[-1].strip()
+        if txt == model:
+            objetivo = items.nth(i)
+            break
+    if objetivo is None:
+        for i in range(total):
+            txt = (await items.nth(i).inner_text()).strip()
+            if model in txt:
+                objetivo = items.nth(i)
+                break
+    if objetivo is None:
+        raise RuntimeError(
+            f"El modelo '{model}' no aparece en el menu de Flow. "
+            "Puede que Google lo haya retirado o renombrado."
+        )
+    await objetivo.click()
+    await page.wait_for_timeout(800)
 
 
 async def select_image_mode(
@@ -71,44 +138,18 @@ async def select_image_mode(
     count: int = 1,
     model: str = "Nano Banana 2",
 ) -> None:
-    """Abre el panel y configura modo IMAGE. Debe llamarse con lock."""
+    """Configura el panel en modo IMAGE."""
     page = await get_page()
+    _validate(model, SEL_MODEL_IMG, "modelo de imagen")
+    ratio = _validate(aspect_ratio, SEL_RATIO, "aspect_ratio")
+    cnt = _validate(count, SEL_COUNT, "count")
 
-    # Abrir panel
-    trigger = page.locator(SEL_PANEL_TRIGGER)
-    await trigger.first.click()
-    await page.wait_for_timeout(500)
-
-    # Seleccionar tab IMAGE
-    await _click_menu_option(page, SEL_TAB_IMAGE, ["Imagen", "Image"])
-    await page.wait_for_timeout(300)
-
-    # Aspect ratio
-    ratio_sel = SEL_RATIO.get(aspect_ratio)
-    if not ratio_sel:
-        raise ValueError(f"aspect_ratio '{aspect_ratio}' no válido. Opciones: {list(SEL_RATIO)}")
-    await _click_menu_option(page, ratio_sel, [aspect_ratio])
-    await page.wait_for_timeout(300)
-
-    # Seleccionar modelo
-    model_sel = SEL_MODEL_IMG.get(model)
-    if model_sel:
-        model_trigger = page.locator('[role="menu"] button[aria-haspopup="menu"], [role="menu"] button[aria-expanded]')
-        if await model_trigger.count() > 0:
-            await model_trigger.first.click()
-            await page.wait_for_timeout(300)
-            await page.locator(model_sel).first.click()
-            await page.wait_for_timeout(300)
-
-    # Cantidad
-    count_sel = SEL_COUNT.get(count)
-    if count_sel:
-        await _click_menu_option(page, count_sel, [f"{count}x", f"{count} var", str(count)])
-        await page.wait_for_timeout(300)
-
-    # Cerrar panel
-    await page.keyboard.press("Escape")
-    await page.wait_for_timeout(300)
+    await _abrir_panel(page)
+    await _click_radio(page, MODE_IMAGE, "modo imagen")
+    await _select_model(page, model)
+    await _click_radio(page, ratio, "aspect ratio")
+    await _click_radio(page, cnt, "cantidad")
+    await _cerrar_panel(page)
 
 
 async def select_video_mode(
@@ -117,48 +158,22 @@ async def select_video_mode(
     aspect_ratio: str = "9:16",
     count: int = 1,
 ) -> None:
-    """Abre el panel y configura modo VIDEO. Debe llamarse con lock."""
+    """Configura el panel en modo VIDEO.
+
+    'mode' se conserva por compatibilidad de firma. En la UI nueva ya no hay
+    sub-pestañas de Fotogramas/Ingredientes dentro del panel: las referencias se
+    adjuntan desde el menu 'add' de la barra de instruccion (ver canvas.py).
+    """
     page = await get_page()
+    if mode not in ("texto", "fotogramas", "ingredientes"):
+        raise ValueError(f"mode '{mode}' no valido. Opciones: texto, fotogramas, ingredientes")
+    _validate(model, SEL_MODEL_VID, "modelo de video")
+    ratio = _validate(aspect_ratio, SEL_RATIO, "aspect_ratio")
+    cnt = _validate(count, SEL_COUNT, "count")
 
-    # Abrir panel
-    trigger = page.locator(SEL_PANEL_TRIGGER)
-    await trigger.first.click()
-    await page.wait_for_timeout(500)
-
-    # Seleccionar tab VIDEO
-    await _click_menu_option(page, SEL_TAB_VIDEO, ["Video"])
-    await page.wait_for_timeout(300)
-
-    # Sub-tab de modo
-    if mode == "fotogramas":
-        await _click_menu_option(page, SEL_TAB_FRAMES, ["Fotogramas", "Frames"])
-    elif mode == "ingredientes":
-        await _click_menu_option(page, SEL_TAB_INGREDIENTS, ["Ingredientes", "References", "Ingredients"])
-    await page.wait_for_timeout(300)
-
-    # Aspect ratio
-    ratio_sel = SEL_RATIO.get(aspect_ratio)
-    if not ratio_sel:
-        raise ValueError(f"aspect_ratio '{aspect_ratio}' no válido.")
-    await _click_menu_option(page, ratio_sel, [aspect_ratio])
-    await page.wait_for_timeout(300)
-
-    # Seleccionar modelo
-    model_sel = SEL_MODEL_VID.get(model)
-    if model_sel:
-        model_trigger = page.locator('[role="menu"] button[aria-haspopup="menu"], [role="menu"] button[aria-expanded]')
-        if await model_trigger.count() > 0:
-            await model_trigger.first.click()
-            await page.wait_for_timeout(300)
-            await page.locator(model_sel).first.click()
-            await page.wait_for_timeout(300)
-
-    # Cantidad
-    count_sel = SEL_COUNT.get(count)
-    if count_sel:
-        await _click_menu_option(page, count_sel, [f"{count}x", f"{count} var", str(count)])
-        await page.wait_for_timeout(300)
-
-    # Cerrar panel
-    await page.keyboard.press("Escape")
-    await page.wait_for_timeout(300)
+    await _abrir_panel(page)
+    await _click_radio(page, MODE_VIDEO, "modo video")
+    await _select_model(page, model)
+    await _click_radio(page, ratio, "aspect ratio")
+    await _click_radio(page, cnt, "cantidad")
+    await _cerrar_panel(page)
