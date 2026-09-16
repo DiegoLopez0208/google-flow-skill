@@ -1,27 +1,27 @@
 ---
 name: google-flow
 description: >
-  Da a cualquier agente de IA la capacidad de manejar Google Flow
-  (flow.google.com) para generar y descargar imagenes y videos. Usa esta skill
-  cuando el usuario pida "entra a Flow", "generame estas imagenes/videos",
-  "descarga esto de Flow", te pase una lista de prompts, o un guion con escenas.
-  OJO: generar cuesta creditos; mira el saldo con `python flow.py creditos`
-  antes de planificar un lote.
+  Gives any AI agent the ability to drive Google Flow (flow.google.com) to
+  generate and download images and videos. Use this skill when the user says
+  "open Flow", "generate these images/videos", "download this from Flow", hands
+  you a list of prompts, or a script with scenes. NOTE: generating costs
+  credits; check the balance with `python flow.py credits` before planning a
+  batch.
 ---
 
-# Skill: Manejar Google Flow
+# Skill: Driving Google Flow
 
-El manual completo vive en **[`skills/google-flow/SKILL.md`](skills/google-flow/SKILL.md)**.
-Esta en esa ruta para que el repo funcione tambien como plugin de Claude Code;
-se mantiene un solo archivo para no tener dos versiones que se desincronicen.
+The full manual lives in **[`skills/google-flow/SKILL.md`](skills/google-flow/SKILL.md)**.
+It sits at that path so the repo also works as a Claude Code plugin, and it is
+kept as a single file so there are never two versions drifting apart.
 
-Lee ese archivo antes de tocar nada. Lo minimo que tenes que saber:
+Read that file before touching anything. The bare minimum:
 
 ```
-python flow.py creditos    # generar CUESTA creditos: mira el saldo primero
-python flow.py login       # una sola vez, lo hace el usuario
-python flow.py image  --prompt "..." --name escena1
-python flow.py video  --prompt "..." --refs personaje.png --name escena1
-python flow.py batch  guion.json
-python flow.py logout --si  # borra la sesion guardada
+python flow.py credits     # generating COSTS credits: check the balance first
+python flow.py login       # once, done by the user
+python flow.py image  --prompt "..." --name scene1
+python flow.py video  --prompt "..." --refs character.png --name scene1
+python flow.py batch  script.json
+python flow.py logout --yes  # delete the saved session
 ```

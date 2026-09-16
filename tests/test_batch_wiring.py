@@ -1,9 +1,9 @@
 """
-Smoke test del cableado de la CLI, sin navegador.
+Smoke tests for the CLI wiring, with no browser.
 
-No prueba los selectores de Flow (eso solo se valida corriendo contra la UI
-real); prueba que batch/refs/registro/report llamen a lo que tienen que llamar,
-en el orden correcto.
+These do not test Flow's selectors (only a real run against the live UI can do
+that); they test that batch, refs, the registry and the report all call what
+they should, in the right order.
 
     python -m unittest discover -s tests
 """
@@ -23,7 +23,7 @@ from flow_provider import registry
 
 
 class FakeFlow:
-    """Doble de flow_provider que anota cada llamada."""
+    """Stand-in for flow_provider that records every call."""
 
     def __init__(self, fail_create: bool = False, caidas_en_descarga: int = 0):
         self.calls: list[tuple] = []
@@ -37,22 +37,22 @@ class FakeFlow:
     def _log(self, name, *args, **kwargs):
         self.calls.append((name, args, kwargs))
 
-    COSTO_ESTIMADO = {"image": 1, "video": 10}
+    ESTIMATED_COST = {"image": 1, "video": 10}
 
     def __init_creditos__(self):
         pass
 
-    async def leer_creditos(self):
+    async def read_credits(self):
         return self.creditos
 
-    def estimar_costo(self, jobs):
-        return sum(self.COSTO_ESTIMADO.get(j.get("type", "image"), 1) * int(j.get("count", 1) or 1)
+    def estimate_cost(self, jobs):
+        return sum(self.ESTIMATED_COST.get(j.get("type", "image"), 1) * int(j.get("count", 1) or 1)
                    for j in jobs)
 
-    def uuids_vistos(self):
+    def seen_asset_ids(self):
         return []
 
-    def navegador_vivo(self):
+    def browser_alive(self):
         return self._vivo
 
     async def startup(self):
@@ -64,13 +64,13 @@ class FakeFlow:
 
     async def navigate_to_project(self, uuid):
         self._log("navigate_to_project", uuid)
-        # Al recargar, Flow renueva el token del src de cada asset.
+        # On reload, Flow reissues the token in every asset's src.
         self.assets = [{**a, "id": a["id"] + "-renovado"} for a in self.assets]
 
     async def create_project(self):
         self._log("create_project")
         if self.fail_create:
-            raise RuntimeError("no se pudo crear el proyecto")
+            raise RuntimeError("could not create the project")
         return ("uuid-proyecto", "https://flow.google.com/project/uuid-proyecto")
 
     async def select_image_mode(self, **kw):
@@ -82,7 +82,7 @@ class FakeFlow:
     async def upload_media(self, path):
         self._log("upload_media", path)
         uuid = f"uuid-subido-{len(self.assets)}"
-        self.assets.append({"id": uuid, "tipo": "image", "listo": True})
+        self.assets.append({"id": uuid, "kind": "image", "ready": True})
         return uuid
 
     async def add_asset_to_prompt(self, uuid):
@@ -94,12 +94,12 @@ class FakeFlow:
     async def submit_prompt(self, prompt):
         self._log("submit_prompt", prompt)
 
-    async def wait_for_new_assets(self, previos, esperados=1, is_video=False, timeout_ms=0):
-        self._log("wait_for_new_assets", esperados, is_video=is_video)
+    async def wait_for_new_assets(self, before, expected=1, is_video=False, timeout_ms=0):
+        self._log("wait_for_new_assets", expected, is_video=is_video)
         self._n += 1
         nuevos = [
-            {"id": f"uuid-gen{self._n}-{i}", "tipo": "video" if is_video else "image", "listo": True}
-            for i in range(esperados)
+            {"id": f"uuid-gen{self._n}-{i}", "kind": "video" if is_video else "image", "ready": True}
+            for i in range(expected)
         ]
         self.assets.extend(nuevos)
         return nuevos
@@ -127,17 +127,17 @@ class FakeFlow:
 
 
 class FakeApi:
-    """API muda: los tests del cableado no deben salir a la red."""
+    """Mute API: the wiring tests must never hit the network."""
 
-    SesionExpirada = api_real.SesionExpirada
+    SessionExpired = api_real.SessionExpired
 
-    def listar_assets(self, project_uuid, sesion=None):
-        raise RuntimeError("sin API en los tests")
+    def list_asset_ids(self, project_uuid, sesion=None):
+        raise RuntimeError("no API in tests")
 
-    def cargar_sesion(self):
+    def load_session(self):
         return None
 
-    async def exportar_desde_pagina(self, page):
+    async def export_from_page(self, page):
         return None
 
 
@@ -158,14 +158,14 @@ class BatchWiringTest(unittest.TestCase):
         cli.api = self._real_api
         self.tmp.cleanup()
 
-    def _run_batch(self, data, ignorar_creditos=False):
+    def _run_batch(self, data, ignore_credits=False):
         jobfile = Path(self.tmp.name) / "guion.json"
         jobfile.write_text(json.dumps(data), encoding="utf-8")
         args = Namespace(jobfile=str(jobfile), out=str(self.out),
-                         ignorar_creditos=ignorar_creditos)
+                         ignore_credits=ignore_credits)
         return asyncio.run(cli.cmd_batch(args))
 
-    def test_corta_si_los_creditos_no_alcanzan(self):
+    def test_stops_when_credits_are_not_enough(self):
         self.fake.creditos = 5
         code = self._run_batch({
             "project": "demo",
@@ -173,20 +173,20 @@ class BatchWiringTest(unittest.TestCase):
         })
         self.assertEqual(code, 1)
         report = json.loads((self.out / "demo" / "batch_report.json").read_text(encoding="utf-8"))
-        self.assertIn("creditos", report[0]["error"])
-        # no se genero nada
+        self.assertIn("credits", report[0]["error"])
+        # nothing was generated
         self.assertEqual(self.fake.find("submit_prompt"), [])
 
-    def test_ignorar_creditos_genera_igual(self):
+    def test_ignore_credits_genera_igual(self):
         self.fake.creditos = 5
         code = self._run_batch({
             "project": "demo",
             "jobs": [{"type": "video", "name": "a", "prompt": "p"}],
-        }, ignorar_creditos=True)
+        }, ignore_credits=True)
         self.assertEqual(code, 0)
         self.assertEqual(len(self.fake.find("submit_prompt")), 1)
 
-    def test_ingredientes_reusan_el_asset_del_proyecto(self):
+    def test_ingredients_reuse_the_project_asset(self):
         code = self._run_batch({
             "project": "demo",
             "jobs": [
@@ -196,11 +196,11 @@ class BatchWiringTest(unittest.TestCase):
         })
         self.assertEqual(code, 0)
 
-        # el video entra en modo ingredientes
-        modos = [c[2]["mode"] for c in self.fake.find("select_video_mode")]
-        self.assertEqual(modos, ["ingredientes"])
+        # the video goes into ingredients mode
+        modes = [c[2]["mode"] for c in self.fake.find("select_video_mode")]
+        self.assertEqual(modes, ["ingredients"])
 
-        # y reusa el UUID que registro el job de imagen, sin volver a subir nada
+        # and reuses the id the image job registered, uploading nothing
         adjuntos = self.fake.find("add_asset_to_prompt")
         self.assertEqual(len(adjuntos), 1)
         self.assertEqual(adjuntos[0][1][0], "uuid-gen1-0")
@@ -210,7 +210,7 @@ class BatchWiringTest(unittest.TestCase):
         self.assertEqual([r["name"] for r in report], ["personaje", "escena1"])
         self.assertTrue(all(r["ok"] for r in report))
 
-    def test_ref_como_archivo_local(self):
+    def test_ref_as_a_local_file(self):
         ref = Path(self.tmp.name) / "cara.png"
         ref.write_bytes(b"x")
         code = self._run_batch({
@@ -222,7 +222,7 @@ class BatchWiringTest(unittest.TestCase):
         self.assertEqual(len(subidas), 1)
         self.assertEqual(subidas[0][1][0], str(ref))
 
-    def test_ref_inexistente_falla_solo_ese_job(self):
+    def test_missing_ref_fails_only_that_job(self):
         code = self._run_batch({
             "project": "demo",
             "jobs": [
@@ -236,7 +236,7 @@ class BatchWiringTest(unittest.TestCase):
         self.assertIn("no_existe", report[0]["error"])
         self.assertTrue(report[1]["ok"])
 
-    def test_fotogramas_falla_con_mensaje_claro(self):
+    def test_frames_mode_fails_with_a_clear_message(self):
         code = self._run_batch({
             "project": "demo",
             "jobs": [
@@ -247,10 +247,10 @@ class BatchWiringTest(unittest.TestCase):
         self.assertEqual(code, 1)
         report = json.loads((self.out / "demo" / "batch_report.json").read_text(encoding="utf-8"))
         self.assertTrue(report[0]["ok"])
-        self.assertIn("Fotogramas", report[1]["error"])
+        self.assertIn("Frames mode", report[1]["error"])
         self.assertIn("--refs", report[1]["error"])
 
-    def test_varias_variantes_se_bajan_todas(self):
+    def test_all_variants_are_downloaded(self):
         code = self._run_batch({
             "project": "demo",
             "jobs": [{"type": "image", "name": "a", "count": 3, "prompt": "p"}],
@@ -261,21 +261,21 @@ class BatchWiringTest(unittest.TestCase):
         report = json.loads((self.out / "demo" / "batch_report.json").read_text(encoding="utf-8"))
         self.assertEqual(len(report[0]["files"]), 3)
 
-    def test_se_recupera_si_el_navegador_se_cae_descargando(self):
+    def test_recovers_when_the_browser_crashes_downloading(self):
         self.fake.caidas_en_descarga = 1
         code = self._run_batch({
             "project": "demo",
             "jobs": [{"type": "image", "name": "a", "prompt": "p"}],
         })
         self.assertEqual(code, 0)
-        # relanzo el navegador y volvio al mismo proyecto
+        # it relaunched the browser and returned to the same project
         self.assertIn("navigate_to_project", self.fake.names())
-        # y reubico el asset pese a que el src cambio al recargar
+        # and relocated the asset even though the src changed on reload
         pedidos = self.fake.find("download_assets")
         self.assertEqual(len(pedidos), 2)
         self.assertTrue(pedidos[1][1][0][0].endswith("-renovado"), pedidos[1])
 
-    def test_ref_se_reubica_tras_recargar_el_proyecto(self):
+    def test_ref_is_relocated_after_a_project_reload(self):
         self.fake.caidas_en_descarga = 1
         code = self._run_batch({
             "project": "demo",
@@ -285,18 +285,18 @@ class BatchWiringTest(unittest.TestCase):
             ],
         })
         self.assertEqual(code, 0)
-        # el ref apunta al src renovado, no al que quedo viejo tras la recarga
+        # the ref points at the reissued src, not the stale one
         adjuntos = self.fake.find("add_asset_to_prompt")
         self.assertEqual(len(adjuntos), 1)
         self.assertTrue(adjuntos[0][1][0].endswith("-renovado"), adjuntos[0])
 
-    def test_fallo_al_crear_proyecto_igual_escribe_reporte(self):
+    def test_report_is_written_even_if_project_creation_fails(self):
         self.fake.fail_create = True
         code = self._run_batch({"project": "demo", "jobs": [{"type": "image", "name": "a", "prompt": "p"}]})
         self.assertEqual(code, 1)
         report = json.loads((self.out / "demo" / "batch_report.json").read_text(encoding="utf-8"))
         self.assertEqual(report[0]["name"], "__batch__")
-        self.assertIn("no se pudo crear", report[0]["error"])
+        self.assertIn("could not create", report[0]["error"])
         self.assertIn("shutdown", self.fake.names())
 
 

@@ -1,0 +1,37 @@
+{
+  "project": "character_refs_demo",
+  "defaults": {
+    "ratio": "9:16",
+    "image_model": "Nano Banana 2",
+    "video_model": "Veo 3.1 - Lite"
+  },
+  "jobs": [
+    {
+      "type": "image",
+      "name": "strawberry",
+      "prompt": "A dramatic cartoon strawberry character with big expressive eyes and long eyelashes, Pixar-style 3D, plain background, full body, vertical"
+    },
+    {
+      "type": "image",
+      "name": "banana",
+      "prompt": "A confident cartoon banana character with a raised eyebrow and a charming smile, Pixar-style 3D, plain background, full body, vertical"
+    },
+    {
+      "type": "video",
+      "name": "scene1",
+      "refs": [
+        "strawberry",
+        "banana"
+      ],
+      "prompt": "The strawberry and the banana argue across a sunny kitchen table. Strawberry: 'I knew you were lying to me!'. Banana: 'I can explain...'. Soft cinematic lighting, slow push-in."
+    },
+    {
+      "type": "video",
+      "name": "scene2",
+      "refs": [
+        "strawberry"
+      ],
+      "prompt": "The strawberry turns away dramatically, a tear rolling down. Strawberry: 'I never want to see you again'. Slow motion, warm backlight."
+    }
+  ]
+}

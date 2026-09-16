@@ -1,40 +1,40 @@
 #!/usr/bin/env python
 """
-flow.py - CLI para manejar Google Flow (labs.google) con Playwright.
+flow.py - CLI for driving Google Flow (flow.google.com).
 
-Esta es la UNICA puerta de entrada. Un agente de IA NO necesita escribir
-codigo de Playwright: solo llama a estos comandos.
+This is the ONLY entry point. An AI agent does NOT need to write any browser
+code: it just calls these commands.
 
 Comandos
 --------
   python flow.py login
-      Abre el navegador para loguearte en Google con tu cuenta. La sesion
-      queda guardada de forma PERMANENTE en session/flowbot-profile.
-      Solo se hace una vez (o cuando caduque la sesion).
+      Opens the browser so you can sign in with your Google account. The
+      session is saved PERMANENTLY in session/flowbot-profile.
+      Only needed once (or whenever the session expires).
 
   python flow.py status
-      Dice si ya hay sesion guardada.
+      Dice si ya hay session guardada.
 
   python flow.py image --prompt "..." [--ratio 9:16] [--model "Nano Banana 2"]
                         [--image referencia.png] [--refs a.png,b.png]
                         [--count 1-4] [--res 1K|2K|4K]
                         [--name escena1] [--out outputs]
-      Genera imagenes (texto->imagen, o con referencias si das --image/--refs).
-      Con --count N baja las N variantes como <name>_1..<name>_N.
+      Generates images (text->image, or reference-guided with --image/--refs).
+      With --count N it downloads all N variants as <name>_1..<name>_N.
 
   python flow.py video --prompt "..." [--ratio 9:16] [--model "Veo 3.1 - Lite"]
                         [--start frame.png] [--end frame_final.png]
                         [--refs personaje.png,fondo.png]
                         [--count 1-4] [--res 720p|1080p]
                         [--name escena1] [--out outputs]
-      Genera video. Sin --start = texto->video. Con --start = anima esa imagen.
+      Genera video. Sin --start = text->video. Con --start = anima esa imagen.
       Con --start y --end = interpola inicio->fin. Con --refs = modo
-      Ingredientes: las referencias guian el video (util para mantener un
-      personaje entre escenas).
+      ingredients mode: the references guide the video, which is how you keep
+      a character consistent across scenes.
 
   python flow.py batch guion.json [--out outputs]
-      Ejecuta una lista de trabajos EN ORDEN dentro de UN solo proyecto Flow.
-      Dentro de un batch, un job puede referenciar a otro por su "name":
+      Runs a list of jobs IN ORDER inside a SINGLE Flow project.
+      Within a batch, a job can reference another one by its "name":
       como fotograma ("start") o como ingrediente ("refs"). Ver
       examples/guion_ejemplo.json y examples/guion_ingredientes.json.
 
@@ -58,7 +58,7 @@ import flow_provider as flow
 from flow_provider import api, registry, settings
 from flow_provider.configure import SEL_COUNT, SEL_MODEL_IMG, SEL_MODEL_VID, SEL_RATIO
 
-# Consola UTF-8 en Windows (acentos/emojis sin romper la salida).
+# UTF-8 console on Windows, so accents and emoji do not break the output.
 if hasattr(sys.stdout, "reconfigure"):
     sys.stdout.reconfigure(encoding="utf-8")
 if hasattr(sys.stderr, "reconfigure"):
@@ -66,7 +66,7 @@ if hasattr(sys.stderr, "reconfigure"):
 
 BASE_DIR = Path(__file__).parent.resolve()
 DEFAULT_OUT = BASE_DIR / "outputs"
-FLOW_URL = "https://labs.google/fx/es-419/tools/flow"
+FLOW_URL = "https://flow.google.com"
 
 
 # ---------------------------------------------------------------------------
@@ -86,11 +86,11 @@ def _out_path(out_dir: Path, name: str, ext: str) -> str:
 
 
 def _resolve_asset(project_dir: Path, ref: str | None) -> str | None:
-    """Resuelve una referencia a un asset (start/end/image) dentro del batch.
+    """Resolve a reference to a file (start/end/image) inside a batch.
 
-    Si 'ref' existe tal cual, se usa. Si no, se busca por nombre dentro de la
-    carpeta del proyecto (con o sin .png). Asi el guion puede encadenar solo
-    con el 'name' de un job anterior, sin rutas largas.
+    If 'ref' exists as given, it is used. Otherwise it is looked up by name in
+    the project folder (with or without .png), so a script can chain jobs using
+    just the previous job's 'name' instead of long paths.
     """
     if not ref:
         return ref
@@ -104,7 +104,7 @@ def _resolve_asset(project_dir: Path, ref: str | None) -> str | None:
         cand_png = project_dir / f"{p.name}.png"
         if cand_png.exists():
             return str(cand_png)
-    return ref  # se deja igual; fallara con error claro si no existe
+    return ref  # left as is; it will fail with a clear error if missing
 
 
 def session_exists() -> bool:
@@ -120,8 +120,8 @@ async def cmd_login(_args) -> int:
     profile.mkdir(parents=True, exist_ok=True)
     print("=== LOGIN GOOGLE FLOW ===")
     print(f"Perfil persistente: {profile}")
-    print("Se abrira Chrome. Inicia sesion con tu cuenta de Google.")
-    print("Cuando veas el boton 'Proyecto nuevo', el script guarda y cierra solo.")
+    print("Chrome will open. Sign in with your Google account.")
+    print("Once the new-project button shows up, this saves and closes itself.")
     print()
 
     async with async_playwright() as p:
@@ -135,7 +135,7 @@ async def cmd_login(_args) -> int:
         page = ctx.pages[0] if ctx.pages else await ctx.new_page()
         await page.goto(FLOW_URL)
 
-        # Poll hasta detectar que ya estamos dentro de Flow logueados.
+        # Poll until we are inside Flow and logged in.
         logged = False
         for i in range(80):  # ~240s
             await page.wait_for_timeout(3000)
@@ -155,14 +155,14 @@ async def cmd_login(_args) -> int:
         await ctx.close()
 
     if logged:
-        print("OK: sesion guardada. Ya puedes generar imagenes/videos.")
+        print("OK: session guardada. Ya puedes generar imagenes/videos.")
         return 0
-    print("AVISO: no se detecto login. Vuelve a correr 'python flow.py login'.")
+    print("WARNING: no login detected. Run 'python flow.py login' again.")
     return 1
 
 
-async def cmd_creditos(_args) -> int:
-    """Muestra los creditos que quedan en la cuenta."""
+async def cmd_credits(_args) -> int:
+    """Show the credits left on the account."""
     if not session_exists():
         print("SIN SESION. Corre primero: python flow.py login")
         return 1
@@ -171,303 +171,303 @@ async def cmd_creditos(_args) -> int:
         page = await flow.get_page()
         await page.goto("https://flow.google.com", wait_until="domcontentloaded")
         await page.wait_for_timeout(8000)
-        saldo = await flow.leer_creditos()
-        if saldo is None:
-            print("No se pudo leer el saldo de creditos.")
+        balance = await flow.read_credits()
+        if balance is None:
+            print("Could not read the credit balance.")
             return 1
-        print(f"Creditos de Google Flow: {saldo}")
-        print(f"Referencia de costo: imagen ~{flow.COSTO_ESTIMADO['image']}, "
-              f"video ~{flow.COSTO_ESTIMADO['video']} por generacion.")
-        if saldo < flow.COSTO_ESTIMADO["video"]:
-            print("No alcanzan para un video. Los creditos se restablecen cada mes.")
+        print(f"Google Flow credits: {balance}")
+        print(f"Cost reference: image ~{flow.ESTIMATED_COST['image']}, "
+              f"video ~{flow.ESTIMATED_COST['video']} per generation.")
+        if balance < flow.ESTIMATED_COST["video"]:
+            print("Not enough for a video. Credits reset once a month.")
         return 0
     finally:
         await flow.shutdown()
 
 
 async def cmd_logout(args) -> int:
-    """Borra la sesion guardada: perfil de Chrome y cache de la API."""
-    perfil = Path(settings.FLOW_CHROME_PROFILE)
-    cache_api = perfil.parent / "api_session.json"
-    objetivos = [p for p in (perfil, cache_api) if p.exists()]
-    if not objetivos:
-        print("No hay sesion guardada: nada que borrar.")
+    """Delete the saved session: Chrome profile and API cache."""
+    profile = Path(settings.FLOW_CHROME_PROFILE)
+    api_cache = profile.parent / "api_session.json"
+    targets = [p for p in (profile, api_cache) if p.exists()]
+    if not targets:
+        print("No saved session: nothing to delete.")
         return 0
 
-    print("Se va a borrar la sesion de Google guardada:")
-    for p in objetivos:
+    print("This will delete the saved Google session:")
+    for p in targets:
         print(f"  {p}")
-    if not args.si:
-        print("\nEsto cierra la sesion y habra que volver a correr 'login'.")
-        print("Para confirmar: python flow.py logout --si")
+    if not args.yes:
+        print("\nThis signs you out; you will have to run 'login' again.")
+        print("To confirm: python flow.py logout --yes")
         return 1
 
-    for p in objetivos:
+    for p in targets:
         if p.is_dir():
             shutil.rmtree(p, ignore_errors=True)
         else:
             p.unlink(missing_ok=True)
-    print("Sesion borrada. Para volver a usar la skill: python flow.py login")
+    print("Session deleted. To use the skill again: python flow.py login")
     return 0
 
 
 async def cmd_status(_args) -> int:
     if session_exists():
-        print(f"OK: sesion presente en {settings.FLOW_CHROME_PROFILE}")
+        print(f"OK: session presente en {settings.FLOW_CHROME_PROFILE}")
         return 0
     print("SIN SESION. Corre primero: python flow.py login")
     return 1
 
 
 # ---------------------------------------------------------------------------
-# Generadores atomicos (asumen proyecto YA abierto)
+# Generadores atomicos (asumen project YA opened)
 # ---------------------------------------------------------------------------
-# Proyecto Flow de la corrida actual. Se necesita para volver a entrar si hay
-# que relanzar el navegador a mitad de camino.
-_PROYECTO = {"uuid": None, "creditos": None}
+# The Flow project for this run. Needed to get back in if the browser has to
+# be relaunched midway.
+_PROJECT = {"uuid": None, "creditos": None}
 
-# El src de un asset lleva un token que vence: al recargar el proyecto cambia.
-# Se guarda ademas su posicion en el canvas para poder reubicarlo.
-_POSICIONES: dict[str, int] = {}
+# An asset src carries an expiring token, so it changes when the project is
+# reloaded. Its position on the canvas is kept too, so it can be relocated.
+_POSITIONS: dict[str, int] = {}
 
 
-async def _abrir_proyecto() -> None:
+async def _open_project() -> None:
     uuid, _url = await flow.create_project()
-    _PROYECTO["uuid"] = uuid
-    # Consultar creditos es gratis y el navegador ya esta abierto.
-    saldo = await flow.leer_creditos()
-    _PROYECTO["creditos"] = saldo
-    if saldo is not None:
-        print(f"  creditos disponibles: {saldo}")
-    # La sesion de API sale de la misma pagina: no cuesta un navegador extra.
+    _PROJECT["uuid"] = uuid
+    # Asking for credits is free and the browser is already open.
+    balance = await flow.read_credits()
+    _PROJECT["creditos"] = balance
+    if balance is not None:
+        print(f"  creditos disponibles: {balance}")
+    # The API session comes from this same page: no extra browser needed.
     try:
-        await api.exportar_desde_pagina(await flow.get_page())
+        await api.export_from_page(await flow.get_page())
     except Exception:
         pass
 
 
-async def _relanzar_navegador() -> None:
-    """Cierra y vuelve a abrir el navegador sobre el mismo proyecto."""
+async def _relaunch_browser() -> None:
+    """Close and reopen the browser on the same project."""
     try:
         await flow.shutdown()
     except Exception:
         pass
     await flow.startup()
-    if _PROYECTO["uuid"]:
-        await flow.navigate_to_project(_PROYECTO["uuid"])
+    if _PROJECT["uuid"]:
+        await flow.navigate_to_project(_PROJECT["uuid"])
 
 
-async def _asegurar_navegador() -> None:
-    """Si el navegador se cayo en el job anterior, lo levanta de nuevo.
+async def _ensure_browser() -> None:
+    """Bring the browser back if it died during the previous job.
 
-    Sin esto, una caida en el primer job arrastraba a todos los demas del batch.
+    Without this, one crash on the first job dragged down every other job in
+    the batch.
     """
-    if not flow.navegador_vivo():
-        print("  el navegador no esta en pie; lo reabro")
-        await _relanzar_navegador()
+    if not flow.browser_alive():
+        print("  the browser is not up; reopening it")
+        await _relaunch_browser()
 
 
-def _revisar_presupuesto(jobs: list[dict], ignorar: bool) -> None:
-    """Corta antes de gastar si los creditos no alcanzan.
+def _check_budget(jobs: list[dict], ignorar: bool) -> None:
+    """Stop before spending if the credits will not cover the run.
 
-    El costo por generacion no lo publica Google: los numeros de COSTO_ESTIMADO
-    son una cota para avisar, no una factura. Por eso se puede seguir igual con
-    --ignorar-creditos.
+    Google does not publish the cost per generation: ESTIMATED_COST is an upper
+    bound used to warn, not a bill. That is why --ignore-credits can override it.
     """
-    saldo = _PROYECTO.get("creditos")
-    if saldo is None:
+    balance = _PROJECT.get("creditos")
+    if balance is None:
         return
-    costo = flow.estimar_costo(jobs)
-    print(f"  costo estimado: ~{costo} credito(s) para {len(jobs)} trabajo(s)")
-    if costo <= saldo:
+    cost = flow.estimate_cost(jobs)
+    print(f"  estimated cost: ~{cost} credit(s) for {len(jobs)} job(s)")
+    if cost <= balance:
         return
-    aviso = (f"Te quedan {saldo} creditos y este lote puede costar ~{costo}. "
-             f"Referencia: imagen ~{flow.COSTO_ESTIMADO['image']}, "
-             f"video ~{flow.COSTO_ESTIMADO['video']}.")
+    warning = (f"You have {balance} credits left and this batch may cost ~{cost}. "
+               f"Reference: image ~{flow.ESTIMATED_COST['image']}, "
+               f"video ~{flow.ESTIMATED_COST['video']}.")
     if ignorar:
-        print(f"  AVISO: {aviso} Sigo porque se paso --ignorar-creditos.")
+        print(f"  WARNING: {warning} Continuing because --ignore-credits was passed.")
         return
     raise RuntimeError(
-        aviso + " Se corto antes de gastar. Reduci el lote, o pasa "
-        "--ignorar-creditos si queres intentarlo igual."
+        warning + " Stopped before spending anything. Shrink the batch, or pass "
+        "--ignore-credits to try anyway."
     )
 
 
-def _es_navegador_caido(e: Exception) -> bool:
-    texto = str(e).lower()
-    return "closed" in texto or "crash" in texto or "disconnected" in texto
+def _is_browser_down(e: Exception) -> bool:
+    text = str(e).lower()
+    return "closed" in text or "crash" in text or "disconnected" in text
 
 
-async def _inventario() -> list:
-    """UUIDs de asset conocidos hasta ahora.
+async def _known_asset_ids() -> list:
+    """Asset ids known so far.
 
-    Se toman del trafico que Flow le manda al navegador: las imagenes no
-    exponen su UUID en el DOM, y consultar la API por nuestra cuenta llega
-    tarde porque el backend tarda en indexar lo recien generado.
+    They come from the traffic Flow sends the browser: images do not expose
+    their id in the DOM, and querying the API ourselves arrives too late,
+    because the backend takes a while to index a fresh result.
     """
     try:
-        return flow.uuids_vistos()
+        return flow.seen_asset_ids()
     except Exception:
         return []
 
 
-async def _descargar_por_api(previos, out_path, esperados, tipo=None):
-    """Baja los assets nuevos por HTTP. Devuelve los paths, o None si no aplica.
+async def _download_via_api(before, out_path, expected, kind=None):
+    """Fetch the new assets over HTTP. Returns the paths, or None if it cannot.
 
-    Es el camino preferido: la descarga por menu del navegador es justo donde
-    Chrome se cae.
+    This is the preferred path: the browser menu download is exactly where
+    Chrome crashes.
     """
-    proyecto = _PROYECTO["uuid"]
-    if not proyecto or previos is None:
+    project = _PROJECT["uuid"]
+    if not project or before is None:
         return None
-    sesion = api.cargar_sesion()
-    if not sesion:
+    session = api.load_session()
+    if not session:
         return None
 
-    vistos = set(previos)
-    candidatos = []
-    for espera in (0, 2, 4, 6):
-        if espera:
-            await asyncio.sleep(espera)
-        candidatos = [u for u in await _inventario()
-                      if u not in vistos and u != proyecto]
-        if candidatos:
+    vistos = set(before)
+    candidates = []
+    for delay in (0, 2, 4, 6):
+        if delay:
+            await asyncio.sleep(delay)
+        candidates = [u for u in await _known_asset_ids()
+                      if u not in vistos and u != project]
+        if candidates:
             break
-    if not candidatos:
-        print("  no aparecio el id del resultado; uso el navegador")
+    if not candidates:
+        print("  the result id never showed up; falling back to the browser")
         return None
 
-    # Un UUID nuevo puede ser cualquier cosa (una escena, un trabajo). Solo
-    # sirve el que responda con una URL de contenido.
-    descargables = []
-    for uuid in candidatos:
+    # A new id can be anything (a scene, a job). Only the ones that answer with
+    # a content URL are of any use.
+    downloadable = []
+    for uuid in candidates:
         try:
-            if api.datos_asset(uuid, sesion, tipo)["url"]:
-                descargables.append(uuid)
+            if api.asset_info(uuid, session, kind)["url"]:
+                downloadable.append(uuid)
         except Exception:
             continue
-        if len(descargables) >= esperados:
+        if len(downloadable) >= expected:
             break
-    if not descargables:
-        print("  ningun id nuevo tenia archivo asociado; uso el navegador")
+    if not downloadable:
+        print("  no new id had a file attached; falling back to the browser")
         return None
 
-    print(f"  descarga por API ({len(descargables)} archivo(s), sin navegador)")
+    print(f"  downloading over the API ({len(downloadable)} file(s), no browser)")
     base = Path(out_path)
-    salidas = []
+    saved_paths = []
     try:
-        for i, uuid in enumerate(descargables, 1):
-            destino = base if len(descargables) == 1 else base.with_name(f"{base.stem}_{i}{base.suffix}")
-            salidas.append(api.descargar(uuid, str(destino), sesion, tipo))
-        return salidas
+        for i, uuid in enumerate(downloadable, 1):
+            dest = base if len(downloadable) == 1 else base.with_name(f"{base.stem}_{i}{base.suffix}")
+            saved_paths.append(api.download(uuid, str(dest), session, kind))
+        return saved_paths
     except Exception as e:
-        print(f"  la descarga por API fallo ({type(e).__name__}); uso el navegador")
+        print(f"  the API download failed ({type(e).__name__}); using the browser")
         return None
 
-async def _descargar(nuevos, out_path, resolution):
-    """Descarga los assets recien generados, sobreviviendo a una caida de Chrome.
+async def _download_via_browser(fresh, out_path, resolution):
+    """Download the fresh assets, surviving a Chrome crash.
 
-    Al recargar el proyecto los src cambian (llevan un token con vencimiento),
-    asi que para reintentar se guarda tambien la posicion de cada asset.
+    Reloading the project changes every src (they carry an expiring token), so
+    each asset position is recorded to make a retry possible.
     """
     todos = await flow.snapshot_assets()
-    posicion = {a["id"]: i for i, a in enumerate(todos)}
-    indices = [posicion.get(a["id"]) for a in nuevos]
+    index_of = {a["id"]: i for i, a in enumerate(todos)}
+    positions = [index_of.get(a["id"]) for a in fresh]
 
-    ids = [a["id"] for a in nuevos]
+    ids = [a["id"] for a in fresh]
     ultimo: Exception | None = None
-    for intento in range(3):
+    for attempt in range(3):
         try:
             return await flow.download_assets(ids, out_path, resolution=resolution)
         except Exception as e:
-            if not _es_navegador_caido(e):
+            if not _is_browser_down(e):
                 raise
             ultimo = e
-            print(f"  el navegador se cayo durante la descarga "
-                  f"(intento {intento + 1}/3); reabro y reintento")
-            await _relanzar_navegador()
+            print(f"  the browser crashed during the download "
+                  f"(attempt {attempt + 1}/3); reabro y reintento")
+            await _relaunch_browser()
             todos = await flow.snapshot_assets()
-            ids = [todos[i]["id"] for i in indices if i is not None and i < len(todos)]
+            ids = [todos[i]["id"] for i in positions if i is not None and i < len(todos)]
             if not ids:
                 raise RuntimeError(
-                    "El navegador se cayo durante la descarga y al reabrir no se "
-                    "pudo reubicar el resultado en el proyecto."
+                    "The browser crashed during the download and the result could "
+                    "not be relocated in the project after reopening."
                 ) from e
     raise RuntimeError(
-        "El navegador se cayo en las tres descargas. El resultado quedo generado "
-        "en el proyecto de Flow; se puede bajar a mano."
+        "The browser crashed on all three download attempts. The result is still "
+        "generated in the Flow project and can be downloaded by hand."
     ) from ultimo
 
 
-async def _registrar(label: str, asset: dict) -> None:
-    """Guarda un asset bajo 'label', con su src y su posicion en el canvas."""
+async def _remember_asset(label: str, asset: dict) -> None:
+    """Store an asset under a label, with its src and its canvas position."""
     registry.capture_name(label, asset["id"])
     todos = await flow.snapshot_assets()
     for i, a in enumerate(todos):
         if a["id"] == asset["id"]:
-            _POSICIONES[label] = i
+            _POSITIONS[label] = i
             break
 
 
-async def _resolver_asset(label: str) -> str | None:
-    """Devuelve el src actual del asset guardado como 'label'.
+async def _current_asset_id(label: str) -> str | None:
+    """Return the current src of the asset stored under a label.
 
-    Si el proyecto se recargo, el src viejo ya no existe y se reubica por
-    posicion.
+    If the project was reloaded the old src no longer exists, so the asset is
+    relocated by position.
     """
-    guardado = registry.get_all().get(label)
-    actuales = await flow.snapshot_assets()
-    if guardado and any(a["id"] == guardado for a in actuales):
-        return guardado
-    idx = _POSICIONES.get(label)
-    if idx is not None and idx < len(actuales):
-        vigente = actuales[idx]["id"]
-        registry.capture_name(label, vigente)
-        return vigente
+    saved_at = registry.get_all().get(label)
+    current = await flow.snapshot_assets()
+    if saved_at and any(a["id"] == saved_at for a in current):
+        return saved_at
+    idx = _POSITIONS.get(label)
+    if idx is not None and idx < len(current):
+        current_id = current[idx]["id"]
+        registry.capture_name(label, current_id)
+        return current_id
     return None
 
 
 async def _attach_refs(refs: list[str]) -> list[str]:
-    """Adjunta referencias al prompt, en orden. Devuelve sus UUIDs.
+    """Attach references to the prompt, in order. Returns their asset ids.
 
-    Cada ref puede ser:
-      - un archivo local  -> se sube al proyecto y se adjunta
-      - el "name" de un job anterior del mismo batch -> se reusa el asset que
-        ya vive en el proyecto Flow, desde el menu del propio resultado
+    Each ref can be:
+      - a local file, uploaded to the project and attached
+      - the "name" of an earlier job in the same batch, which reuses the asset
+        already in the Flow project, from the result own menu
     """
     known = registry.get_all()
     uuids: list[str] = []
     for ref in refs:
-        # Primero el registry: reusar el asset del proyecto sale mas barato y
-        # mas consistente que volver a subir el archivo.
+        # Registry first: reusing the project asset is cheaper and more
+        # consistent than uploading the file again.
         label = ref if ref in known else Path(ref).stem
         if label in known:
-            vigente = await _resolver_asset(label)
-            if vigente is None:
+            current_id = await _current_asset_id(label)
+            if current_id is None:
                 raise ValueError(
-                    f"La referencia '{ref}' se genero en este batch pero ya no se "
-                    "encuentra en el proyecto de Flow."
+                    f"Reference {ref!r} was generated in this batch but is no "
+                    "longer in the Flow project."
                 )
-            await flow.add_asset_to_prompt(vigente)
-            uuids.append(vigente)
+            await flow.add_asset_to_prompt(current_id)
+            uuids.append(current_id)
             continue
         path = Path(ref)
         if path.exists():
             uuids.append(await flow.upload_media(str(path)))
             continue
         raise ValueError(
-            f"Referencia '{ref}': no es un archivo existente ni el nombre de un job "
-            "anterior de este batch. Las referencias por nombre solo funcionan dentro "
-            "de una misma corrida de 'batch'."
+            f"Reference {ref!r}: not an existing file, and not the name of an "
+            "earlier job in this batch. References by name only work within a "
+            "single batch run."
         )
     return uuids
 
 
 def _no_soportado_fotogramas():
     raise ValueError(
-        "El modo Fotogramas (--start/--end) todavia no esta portado a la UI nueva "
-        "de Flow: el panel ya no tiene las ranuras Iniciar/Fin. Usa --refs para "
-        "guiar el video con imagenes de referencia."
+        "Frames mode (--start/--end) is not ported to the new Flow UI: the panel "
+        "no longer has the start/end slots. Use --refs to guide the video with "
+        "reference images instead."
     )
 
 
@@ -476,34 +476,34 @@ async def _gen_image(prompt, ratio, model, count, refs, out_path,
     await flow.select_image_mode(aspect_ratio=ratio, count=count, model=model)
     if refs:
         await _attach_refs(refs)
-    previos = await flow.snapshot_assets()
-    previos_api = await _inventario()
+    before = await flow.snapshot_assets()
+    previos_api = await _known_asset_ids()
     await flow.submit_prompt(prompt)
-    nuevos = await flow.wait_for_new_assets(previos, esperados=count,
+    fresh = await flow.wait_for_new_assets(before, expected=count,
                                             is_video=False, timeout_ms=240_000)
-    if label and nuevos:
-        await _registrar(label, nuevos[0])
-    saved = await _descargar_por_api(previos_api, out_path, count, "image")
-    return saved if saved else await _descargar(nuevos, out_path, resolution)
+    if label and fresh:
+        await _remember_asset(label, fresh[0])
+    saved = await _download_via_api(previos_api, out_path, count, "image")
+    return saved if saved else await _download_via_browser(fresh, out_path, resolution)
 
 
 async def _gen_video(prompt, ratio, model, count, start, end, refs, out_path,
                      resolution="720p", label=None) -> list[str]:
     if start or end:
         _no_soportado_fotogramas()
-    await flow.select_video_mode(mode="ingredientes" if refs else "texto",
+    await flow.select_video_mode(mode="ingredients" if refs else "text",
                                  model=model, aspect_ratio=ratio, count=count)
     if refs:
         await _attach_refs(refs)
-    previos = await flow.snapshot_assets()
-    previos_api = await _inventario()
+    before = await flow.snapshot_assets()
+    previos_api = await _known_asset_ids()
     await flow.submit_prompt(prompt)
-    nuevos = await flow.wait_for_new_assets(previos, esperados=count,
+    fresh = await flow.wait_for_new_assets(before, expected=count,
                                             is_video=True, timeout_ms=600_000)
-    if label and nuevos:
-        await _registrar(label, nuevos[0])
-    saved = await _descargar_por_api(previos_api, out_path, count, "video")
-    return saved if saved else await _descargar(nuevos, out_path, resolution)
+    if label and fresh:
+        await _remember_asset(label, fresh[0])
+    saved = await _download_via_api(previos_api, out_path, count, "video")
+    return saved if saved else await _download_via_browser(fresh, out_path, resolution)
 
 
 def _split_refs(value):
@@ -521,7 +521,7 @@ async def cmd_image(args) -> int:
     refs = _split_refs(args.refs) or ([args.image] if args.image else [])
     await flow.startup()
     try:
-        await _abrir_proyecto()
+        await _open_project()
         saved = await _gen_image(args.prompt, args.ratio, args.model, args.count, refs,
                                  out_path, resolution=args.res, label=name)
         for f in saved:
@@ -541,7 +541,7 @@ async def cmd_video(args) -> int:
     refs = _split_refs(args.refs)
     await flow.startup()
     try:
-        await _abrir_proyecto()
+        await _open_project()
         saved = await _gen_video(args.prompt, args.ratio, args.model, args.count,
                                  args.start, args.end, refs, out_path,
                                  resolution=args.res, label=name)
@@ -564,7 +564,7 @@ async def cmd_batch(args) -> int:
     d_vid_model = defaults.get("video_model", "Veo 3.1 - Lite")
     jobs = data.get("jobs", [])
 
-    # Cada proyecto va a su propia subcarpeta: facil de revisar y de borrar.
+    # Each project gets its own subfolder: easy to review and to delete.
     project = data.get("project") or f"proyecto_{_stamp()}"
     project_dir = Path(args.out) / _safe(project)
     project_dir.mkdir(parents=True, exist_ok=True)
@@ -573,15 +573,15 @@ async def cmd_batch(args) -> int:
     results: list[dict] = []
     report = project_dir / "batch_report.json"
 
-    # Los UUIDs registrados pertenecen a UN proyecto Flow. Cada batch abre uno
-    # nuevo, asi que arrancar con el registry limpio.
+    # Los UUIDs registrados pertenecen a UN project Flow. Cada batch abre uno
+    # a new one, so start with an empty registry.
     registry.clear()
-    _POSICIONES.clear()
+    _POSITIONS.clear()
 
     await flow.startup()
     try:
-        await _abrir_proyecto()
-        _revisar_presupuesto(jobs, getattr(args, "ignorar_creditos", False))
+        await _open_project()
+        _check_budget(jobs, getattr(args, "ignore_credits", False))
         for i, job in enumerate(jobs, 1):
             jtype = job.get("type", "image")
             name = job.get("name") or f"{jtype}_{i:02d}"
@@ -593,7 +593,7 @@ async def cmd_batch(args) -> int:
                 refs = _split_refs(refs)
             print(f"\n--- [{i}/{len(jobs)}] {jtype} :: {name} ---")
             try:
-                await _asegurar_navegador()
+                await _ensure_browser()
                 if jtype == "image":
                     if not refs and job.get("image"):
                         refs = [_resolve_asset(project_dir, job["image"])]
@@ -611,9 +611,9 @@ async def cmd_batch(args) -> int:
                         out_path, resolution=job.get("res", "720p"), label=name,
                     )
                 else:
-                    print(f"  tipo desconocido '{jtype}', saltando.")
+                    print(f"  kind desconocido '{jtype}', saltando.")
                     results.append({"name": name, "type": jtype, "ok": False,
-                                    "error": f"tipo desconocido '{jtype}'"})
+                                    "error": f"kind desconocido '{jtype}'"})
                     continue
                 for f in saved:
                     print(f"  OK -> {f}")
@@ -622,8 +622,8 @@ async def cmd_batch(args) -> int:
                 print(f"  ERROR en '{name}': {e}")
                 results.append({"name": name, "type": jtype, "ok": False, "error": str(e)})
     except Exception as e:
-        # Fallo fuera de los jobs (ej. crear el proyecto). Se anota y se escribe
-        # el reporte igual: perderlo dejaba al agente a ciegas.
+        # Failure outside the jobs (e.g. creating the project). It is recorded
+        # and the report still written: losing it left the agent blind.
         print(f"BATCH abortado: {e}")
         results.append({"name": "__batch__", "type": "setup", "ok": False, "error": str(e)})
     finally:
@@ -643,10 +643,10 @@ async def cmd_clean(args) -> int:
             print(f"No existe: {target}")
             return 0
         shutil.rmtree(target)
-        print(f"Borrado proyecto: {target}")
+        print(f"Borrado project: {target}")
         return 0
     if not out_dir.exists():
-        print(f"Nada que limpiar en {out_dir}")
+        print(f"Nothing to clean in {out_dir}")
         return 0
     borrados = 0
     for child in out_dir.iterdir():
@@ -668,52 +668,52 @@ def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description="CLI Google Flow (Playwright).")
     sub = p.add_subparsers(dest="cmd", required=True)
 
-    sub.add_parser("login", help="Loguearse en Google Flow (una vez).")
-    sub.add_parser("status", help="Ver si hay sesion guardada.")
-    sub.add_parser("creditos", help="Ver los creditos que quedan en la cuenta.")
+    sub.add_parser("login", help="Sign in to Google Flow (once).")
+    sub.add_parser("status", help="Check whether a session is saved.")
+    sub.add_parser("credits", help="Show the credits left on the account.")
 
-    pl = sub.add_parser("logout", help="Borrar la sesion guardada.")
-    pl.add_argument("--si", action="store_true",
-                    help="Confirmar el borrado sin preguntar.")
+    pl = sub.add_parser("logout", help="Delete the saved session.")
+    pl.add_argument("--yes", action="store_true",
+                    help="Confirm the deletion without prompting.")
 
-    pi = sub.add_parser("image", help="Generar una imagen.")
+    pi = sub.add_parser("image", help="Generate an image.")
     pi.add_argument("--prompt", required=True)
     pi.add_argument("--ratio", default="9:16", choices=list(SEL_RATIO))
     pi.add_argument("--model", default="Nano Banana 2", choices=list(SEL_MODEL_IMG))
     pi.add_argument("--count", type=int, default=1, choices=list(SEL_COUNT))
-    pi.add_argument("--image", default=None, help="Imagen de referencia para editar.")
+    pi.add_argument("--image", default=None, help="Reference image to edit.")
     pi.add_argument("--refs", default=None,
-                    help="Referencias separadas por coma: archivos locales y/o nombres de "
-                         "jobs anteriores del mismo batch (ingredientes).")
+                    help="Comma-separated references: local files and/or names of "
+                         "earlier jobs in the same batch (ingredients).")
     pi.add_argument("--res", default="1K", choices=["1K", "2K", "4K"],
-                    help="Resolucion de descarga.")
+                    help="Download resolution.")
     pi.add_argument("--name", default=None)
     pi.add_argument("--out", default=str(DEFAULT_OUT))
 
-    pv = sub.add_parser("video", help="Generar un video.")
+    pv = sub.add_parser("video", help="Generate a video.")
     pv.add_argument("--prompt", required=True)
     pv.add_argument("--ratio", default="9:16", choices=list(SEL_RATIO))
     pv.add_argument("--model", default="Veo 3.1 - Lite", choices=list(SEL_MODEL_VID))
     pv.add_argument("--count", type=int, default=1, choices=list(SEL_COUNT))
-    pv.add_argument("--start", default=None, help="Fotograma inicial (imagen).")
-    pv.add_argument("--end", default=None, help="Fotograma final (imagen).")
+    pv.add_argument("--start", default=None, help="Start frame (image). Not ported to the new UI.")
+    pv.add_argument("--end", default=None, help="End frame (image). Not ported to the new UI.")
     pv.add_argument("--refs", default=None,
-                    help="Ingredientes separados por coma: archivos locales y/o nombres de "
-                         "jobs anteriores del mismo batch. Activa el modo Ingredientes.")
+                    help="Comma-separated ingredients: local files and/or names of "
+                         "earlier jobs in the same batch. Turns on ingredients mode.")
     pv.add_argument("--res", default="720p", choices=["720p", "1080p", "4K"],
-                    help="Resolucion de descarga.")
+                    help="Download resolution.")
     pv.add_argument("--name", default=None)
     pv.add_argument("--out", default=str(DEFAULT_OUT))
 
-    pb = sub.add_parser("batch", help="Ejecutar guion JSON de varios trabajos.")
+    pb = sub.add_parser("batch", help="Run a JSON script with several jobs.")
     pb.add_argument("jobfile")
     pb.add_argument("--out", default=str(DEFAULT_OUT))
-    pb.add_argument("--ignorar-creditos", dest="ignorar_creditos", action="store_true",
-                    help="Generar aunque el saldo estimado no alcance.")
+    pb.add_argument("--ignore-credits", dest="ignore_credits", action="store_true",
+                    help="Generate even if the estimated balance will not cover it.")
 
-    pc = sub.add_parser("clean", help="Borrar resultados de outputs.")
+    pc = sub.add_parser("clean", help="Delete results from outputs.")
     pc.add_argument("project", nargs="?", default=None,
-                    help="Nombre del proyecto a borrar. Vacio = limpiar todo outputs.")
+                    help="Project name to delete. Empty = clean the whole outputs folder.")
     pc.add_argument("--out", default=str(DEFAULT_OUT))
 
     return p
@@ -722,7 +722,7 @@ def build_parser() -> argparse.ArgumentParser:
 HANDLERS = {
     "login": cmd_login,
     "status": cmd_status,
-    "creditos": cmd_creditos,
+    "credits": cmd_credits,
     "logout": cmd_logout,
     "image": cmd_image,
     "video": cmd_video,
@@ -741,8 +741,8 @@ EASTER_EGG = r"""
   | |\  | |_| |  _ <| |_| |
   |_| \_|\___/|_| \_\\___/     x   B R P L
 
-  Google Flow Skill -- forjado por NURO para BRPL.
-  El contexto es el verdadero superpoder. Disfruta y crea.
+  Google Flow Skill -- forged by NURO for BRPL.
+  Context is the real superpower. Enjoy, and create.
 """
 
 

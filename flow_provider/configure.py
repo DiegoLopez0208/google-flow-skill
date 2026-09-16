@@ -1,27 +1,26 @@
 """
-Seleccion de modo (IMAGE/VIDEO), aspect ratio, cantidad y modelo.
+Picking mode (image/video), aspect ratio, count and model.
 
-UI nueva de Flow (Angular Material, flow.google.com, mapeada 2026-09-16).
-Todo vive detras de UN boton de configuracion en la barra de instruccion:
+New Flow UI (Angular Material, flow.google.com, mapped 2026-09-16). Everything
+lives behind ONE settings button on the prompt bar:
 
     flow-base-prompt-box button[aria-label*="onfiguraci"]
       [role=radio] "image Imagen" / "videocam Video"
       [role=radio] "crop_16_9 16:9" ... "crop_9_16 9:16"
       [role=radio] "x1".."x4"
-      button[aria-label*="familia de modelos"] -> [role=menuitem] por nombre
+      button[aria-label*="familia de modelos"] -> [role=menuitem] by name
 
-Los selectores se anclan al NOMBRE DEL ICONO (google-symbols: "image",
-"videocam", "crop_9_16"), que no se traduce. El texto en español queda solo
-como respaldo.
+Options are matched on the google-symbols ICON NAME ("image", "videocam",
+"crop_9_16"), which is never translated. The Spanish label is only a fallback.
 """
-from .browser import cerrar_overlays, get_page
+from .browser import close_overlays, get_page
 
-# Custom element de Angular: el scope mas estable que hay en esta UI.
+# Angular custom element: the most stable scope this UI offers.
 SEL_PROMPT_BOX = "flow-base-prompt-box"
 SEL_CONFIG_BTN = f'{SEL_PROMPT_BOX} button[aria-label*="onfiguraci"]'
 SEL_MODEL_BTN = 'button[aria-label*="familia de modelos"]'
 
-# (nombre del icono, texto de respaldo)
+# (icon name, fallback label)
 MODE_IMAGE = ("image", "Imagen")
 MODE_VIDEO = ("videocam", "Video")
 
@@ -34,53 +33,53 @@ SEL_RATIO = {
 }
 SEL_COUNT = {i: (f"x{i}", f"x{i}") for i in range(1, 5)}
 
-MODELOS_IMAGEN = ["Nano Banana Pro", "Nano Banana 2", "Nano Banana 2 Lite"]
-MODELOS_VIDEO = ["Veo 3.1 - Quality", "Veo 3.1 - Fast", "Veo 3.1 - Lite", "Omni 1.1 Flash"]
+IMAGE_MODELS = ["Nano Banana Pro", "Nano Banana 2", "Nano Banana 2 Lite"]
+VIDEO_MODELS = ["Veo 3.1 - Quality", "Veo 3.1 - Fast", "Veo 3.1 - Lite", "Omni 1.1 Flash"]
 
-# Tablas para que flow.py valide en argparse sin duplicar los nombres.
-SEL_MODEL_IMG = {m: m for m in MODELOS_IMAGEN}
-SEL_MODEL_VID = {m: m for m in MODELOS_VIDEO}
+# Tables so flow.py can validate in argparse without duplicating the names.
+SEL_MODEL_IMG = {m: m for m in IMAGE_MODELS}
+SEL_MODEL_VID = {m: m for m in VIDEO_MODELS}
 
 
 def _validate(value, table, label):
-    """Falla temprano ante un nombre invalido en vez de generar con otra cosa."""
+    """Fail early on a bad name instead of generating with something else."""
     if value not in table:
-        raise ValueError(f"{label} '{value}' no valido. Opciones: {list(table)}")
+        raise ValueError(f"{label} '{value}' is not valid. Options: {list(table)}")
     return table[value]
 
 
-async def _click_radio(page, opcion: tuple[str, str], etiqueta: str) -> None:
-    """Clickea un [role=radio] del panel, por icono y si no por texto."""
-    icono, texto = opcion
-    for termino in (icono, texto):
-        loc = page.locator(f'[role="radio"]:has-text("{termino}")')
+async def _click_option(page, option: tuple[str, str], label: str) -> None:
+    """Click a [role=radio] in the panel, by icon name and then by label."""
+    icon, text = option
+    for term in (icon, text):
+        loc = page.locator(f'[role="radio"]:has-text("{term}")')
         if await loc.count() and await loc.first.is_visible():
             await loc.first.click()
             await page.wait_for_timeout(500)
             return
     raise RuntimeError(
-        f"No se encontro la opcion de {etiqueta} ('{icono}'/'{texto}') en el panel "
-        "de configuracion. La UI de Flow pudo cambiar."
+        f"Could not find the {label} option ('{icon}'/'{text}') in the settings "
+        "panel. Flow's UI may have changed."
     )
 
 
-async def _abrir_panel(page) -> None:
-    """Abre el panel de configuracion y confirma que se pinto.
+async def _open_panel(page) -> None:
+    """Open the settings panel and confirm it actually rendered.
 
-    Esperar un tiempo fijo no alcanza: despues de una descarga el menu anterior
-    todavia puede estar cerrandose y el click cae sobre el overlay. Se reintenta
-    hasta ver los radios.
+    A fixed wait is not enough: right after a download the previous menu may
+    still be closing and the click lands on the overlay instead. Retry until the
+    radios are visible.
     """
     btn = page.locator(SEL_CONFIG_BTN)
     if await btn.count() == 0:
         raise RuntimeError(
-            "No se encontro el boton de configuracion de la barra de instruccion. "
-            "El proyecto pudo no haber terminado de cargar."
+            "Could not find the settings button on the prompt bar. "
+            "The project may not have finished loading."
         )
 
     for _ in range(3):
-        await cerrar_overlays(page)
-        # Sacar el mouse de las tarjetas: el hotbar del hover tapa la barra.
+        await close_overlays(page)
+        # Move the mouse off the cards: a hovered tile's hotbar covers the bar.
         await page.mouse.move(5, 5)
         await page.wait_for_timeout(400)
         await btn.first.click()
@@ -91,45 +90,44 @@ async def _abrir_panel(page) -> None:
             await page.keyboard.press("Escape")
             await page.wait_for_timeout(800)
 
-    raise RuntimeError(
-        "El panel de configuracion no llego a abrirse tras tres intentos."
-    )
+    raise RuntimeError("The settings panel would not open after three tries.")
 
-async def _cerrar_panel(page) -> None:
-    await cerrar_overlays(page)
+
+async def _close_panel(page) -> None:
+    await close_overlays(page)
     await page.wait_for_timeout(500)
 
 
 async def _select_model(page, model: str) -> None:
-    """Abre el submenu de familia de modelos y elige por nombre."""
+    """Open the model-family submenu and pick one by name."""
     btn = page.locator(SEL_MODEL_BTN)
     if await btn.count() == 0:
-        raise RuntimeError(f"No se encontro el selector de modelo para elegir '{model}'.")
+        raise RuntimeError(f"Could not find the model picker to select '{model}'.")
     await btn.first.click()
     await page.wait_for_timeout(1500)
 
     items = page.locator('[role="menuitem"]')
     total = await items.count()
-    objetivo = None
-    # Los nombres se solapan: "Nano Banana 2" tambien esta dentro de
-    # "Nano Banana 2 Lite". Se busca coincidencia exacta del texto final.
+    target = None
+    # Names overlap: "Nano Banana 2" is also inside "Nano Banana 2 Lite", so
+    # look for an exact match on the final line of text first.
     for i in range(total):
-        txt = (await items.nth(i).inner_text()).strip().splitlines()[-1].strip()
-        if txt == model:
-            objetivo = items.nth(i)
+        text = (await items.nth(i).inner_text()).strip().splitlines()[-1].strip()
+        if text == model:
+            target = items.nth(i)
             break
-    if objetivo is None:
+    if target is None:
         for i in range(total):
-            txt = (await items.nth(i).inner_text()).strip()
-            if model in txt:
-                objetivo = items.nth(i)
+            text = (await items.nth(i).inner_text()).strip()
+            if model in text:
+                target = items.nth(i)
                 break
-    if objetivo is None:
+    if target is None:
         raise RuntimeError(
-            f"El modelo '{model}' no aparece en el menu de Flow. "
-            "Puede que Google lo haya retirado o renombrado."
+            f"Model '{model}' is not in Flow's menu. "
+            "Google may have retired or renamed it."
         )
-    await objetivo.click()
+    await target.click()
     await page.wait_for_timeout(800)
 
 
@@ -138,42 +136,42 @@ async def select_image_mode(
     count: int = 1,
     model: str = "Nano Banana 2",
 ) -> None:
-    """Configura el panel en modo IMAGE."""
+    """Put the panel in image mode."""
     page = await get_page()
-    _validate(model, SEL_MODEL_IMG, "modelo de imagen")
+    _validate(model, SEL_MODEL_IMG, "image model")
     ratio = _validate(aspect_ratio, SEL_RATIO, "aspect_ratio")
     cnt = _validate(count, SEL_COUNT, "count")
 
-    await _abrir_panel(page)
-    await _click_radio(page, MODE_IMAGE, "modo imagen")
+    await _open_panel(page)
+    await _click_option(page, MODE_IMAGE, "image mode")
     await _select_model(page, model)
-    await _click_radio(page, ratio, "aspect ratio")
-    await _click_radio(page, cnt, "cantidad")
-    await _cerrar_panel(page)
+    await _click_option(page, ratio, "aspect ratio")
+    await _click_option(page, cnt, "count")
+    await _close_panel(page)
 
 
 async def select_video_mode(
-    mode: str = "texto",
+    mode: str = "text",
     model: str = "Veo 3.1 - Lite",
     aspect_ratio: str = "9:16",
     count: int = 1,
 ) -> None:
-    """Configura el panel en modo VIDEO.
+    """Put the panel in video mode.
 
-    'mode' se conserva por compatibilidad de firma. En la UI nueva ya no hay
-    sub-pestañas de Fotogramas/Ingredientes dentro del panel: las referencias se
-    adjuntan desde el menu 'add' de la barra de instruccion (ver canvas.py).
+    'mode' is kept for signature compatibility. The new UI has no frames or
+    ingredients sub-tabs inside this panel: references are attached from the
+    prompt bar's add menu (see canvas.py).
     """
     page = await get_page()
-    if mode not in ("texto", "fotogramas", "ingredientes"):
-        raise ValueError(f"mode '{mode}' no valido. Opciones: texto, fotogramas, ingredientes")
-    _validate(model, SEL_MODEL_VID, "modelo de video")
+    if mode not in ("text", "frames", "ingredients"):
+        raise ValueError(f"mode '{mode}' is not valid. Options: text, frames, ingredients")
+    _validate(model, SEL_MODEL_VID, "video model")
     ratio = _validate(aspect_ratio, SEL_RATIO, "aspect_ratio")
     cnt = _validate(count, SEL_COUNT, "count")
 
-    await _abrir_panel(page)
-    await _click_radio(page, MODE_VIDEO, "modo video")
+    await _open_panel(page)
+    await _click_option(page, MODE_VIDEO, "video mode")
     await _select_model(page, model)
-    await _click_radio(page, ratio, "aspect ratio")
-    await _click_radio(page, cnt, "cantidad")
-    await _cerrar_panel(page)
+    await _click_option(page, ratio, "aspect ratio")
+    await _click_option(page, cnt, "count")
+    await _close_panel(page)

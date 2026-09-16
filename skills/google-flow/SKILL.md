@@ -1,248 +1,268 @@
 ---
 name: google-flow
 description: >
-  Da a cualquier agente de IA la capacidad de manejar Google Flow (labs.google)
-  para generar y descargar imagenes y videos. Usa esta skill cuando el usuario
-  pida "entra a Flow", "generame estas imagenes/videos", "descarga esto de Flow",
-  te pase una lista de prompts, o un guion con escenas (narracion + prompt de
-  imagen + prompt de video). El agente interpreta el guion, arma un plan ordenado
-  y ejecuta la CLI flow.py. La sesion de Google queda guardada de forma permanente.
+  Gives any AI agent the ability to drive Google Flow (flow.google.com) to
+  generate and download images and videos. Use this skill when the user says
+  "open Flow", "generate these images/videos", "download this from Flow", hands
+  you a list of prompts, or a script with scenes (narration + image prompt +
+  video prompt). The agent reads the script, builds an ordered plan and runs the
+  flow.py CLI. The Google session is saved permanently. NOTE: generating costs
+  credits — check the balance with `python flow.py credits` before planning a
+  batch.
 ---
 
-# Skill: Manejar Google Flow
+# Skill: Driving Google Flow
 
-Eres el **cerebro**. `flow.py` son las **manos**. Tu trabajo es:
-1. Entender lo que el usuario quiere (interpretar su guion/lista, en el formato que sea).
-2. Convertirlo en un plan ordenado.
-3. Ejecutar la CLI `flow.py`. **No** escribes Playwright tu mismo: ya esta resuelto.
+You are the **brain**. `flow.py` is the **hands**. Your job:
+1. Understand what the user wants (read their script or list, in whatever shape).
+2. Turn it into an ordered plan.
+3. Run the `flow.py` CLI. You do **not** write browser code: that is solved.
 
-Google Flow genera imagenes (Nano Banana) y videos (Veo). **No es gratis**: cada
-generacion consume creditos de la cuenta y el saldo se restablece una vez por mes
-(ver seccion 0). Esta skill te da el control de Flow; la creatividad de los
-prompts la pones tu, y el cuidado del saldo tambien.
-
----
-
-## 0. Los creditos son el recurso escaso
-
-Generar **cuesta creditos** y se agotan. Un video de Veo cuesta del orden de diez
-veces lo que una imagen, y el saldo se restablece una vez por mes.
-
-Antes de proponer un plan de varias escenas:
-
-```
-python flow.py creditos
-```
-
-Reglas, no sugerencias:
-
-- **Consulta el saldo antes de un lote** y decile al usuario cuanto va a costar
-  aproximadamente. `batch` lo estima solo y **corta sin generar** si no alcanza;
-  solo se fuerza con `--ignorar-creditos`, y eso lo decide el usuario, no vos.
-- **Nunca generes de prueba "para ver como sale"** si el saldo esta bajo. Una
-  imagen es barata; un video no.
-- Si quedan menos creditos que el costo de un video, decilo de entrada en vez de
-  intentar y fallar a mitad del guion.
-- `--count 4` cuesta cuatro veces. No lo uses salvo que el usuario lo pida.
-- Si un lote se corta por saldo, lo ya generado sigue en el proyecto de Flow: no
-  se perdio, se puede bajar despues.
-
-## 0.1 Regla de oro
-
-- **Nunca** abras Playwright a mano ni inventes selectores. Siempre usa `python flow.py ...`.
-- **Siempre** trabaja desde la carpeta de la skill (donde esta `flow.py`). Si la
-  skill vino instalada como plugin, esa carpeta es la raiz del plugin, dos
-  niveles arriba de este archivo (`skills/google-flow/SKILL.md`): entra ahi con
-  `cd` antes de correr nada, o pasa la ruta completa a `python`.
-- Si no hay sesion, lo primero es `python flow.py login` (lo hace el usuario una vez).
-- Sé ordenado: cada salida va a `outputs/` con un nombre claro. Para varios trabajos,
-  arma un guion JSON y usa `batch` (no lances 10 comandos sueltos).
+Google Flow generates images (Nano Banana) and videos (Veo). **It is not free**:
+every generation spends credits from the account, and the balance resets once a
+month (see section 0). This skill gives you control of Flow; the prompt
+creativity is yours, and so is looking after the balance.
 
 ---
 
-## 1. Preparacion (la haces TU, el agente, automaticamente)
+## 0. Credits are the scarce resource
 
-Tienes terminal y filesystem: **instala tu solo** en el primer uso. No le pidas al
-usuario que copie comandos.
+Generating **costs credits** and they run out. A Veo video costs on the order of
+ten times an image, and the balance refills once a month.
 
-Protocolo de arranque (haz esto la primera vez, o si algo falla por dependencias):
+Before proposing a multi-scene plan:
 
 ```
-1. python setup.py          # instala dependencias + navegador. Lo corres TU.
-2. python flow.py status     # si dice "SIN SESION" -> pasa al paso 3.
-3. python flow.py login      # corre esto y pide al usuario que inicie sesion
-                             # en la ventana de Chrome que se abre. Se guarda solo.
+python flow.py credits
 ```
 
-Detalles:
-- `setup.py` solo necesita Python; instala el resto. Si ya esta todo, no rompe nada.
-- `login` abre Chrome; el **usuario** inicia sesion con su cuenta de Google (eso no lo
-  puedes hacer tu). Cuando aparece "Proyecto nuevo", se guarda en `session/flowbot-profile/`
-  y cierra solo. Es permanente: solo se repite si caduca.
-- Requisito del sistema: Google Chrome instalado (la skill usa el Chrome real).
+Rules, not suggestions:
 
-Si al correr un comando ves un error de import (ej. "No module named playwright"),
-corre `python setup.py` y reintenta.
+- **Check the balance before a batch** and tell the user roughly what it will
+  cost. `batch` estimates it itself and **stops without generating** when it
+  will not fit; only `--ignore-credits` forces it, and that is the user's call,
+  not yours.
+- **Never generate a test "just to see how it looks"** when the balance is low.
+  An image is cheap; a video is not.
+- If fewer credits remain than a video costs, say so up front instead of trying
+  and failing halfway through the script.
+- `--count 4` costs four times as much. Do not use it unless asked.
+- If a batch stops on budget, whatever was already generated is still in the
+  Flow project: nothing is lost, it can be downloaded later.
 
-Para cerrar sesion (cambiar de cuenta, o dejar la maquina limpia):
-`python flow.py logout --si`. Borra el perfil de Chrome y la cache de la API, y
-hay que volver a hacer `login`. No lo corras por tu cuenta: solo si el usuario
-lo pide.
+## 0.1 Golden rules
+
+- **Never** drive the browser by hand or invent selectors. Always use
+  `python flow.py ...`.
+- **Always** work from the skill folder (the one holding `flow.py`). If the skill
+  was installed as a plugin, that folder is the plugin root, two levels above
+  this file (`skills/google-flow/SKILL.md`): `cd` there first, or pass the full
+  path to `python`.
+- If there is no session, the first step is `python flow.py login` (the user does
+  this once).
+- Be tidy: every output goes to `outputs/` with a clear name. For several jobs,
+  write a JSON script and use `batch` (do not fire ten separate commands).
 
 ---
 
-## 2. Las 3 operaciones que sabes hacer
+## 1. Setup (YOU do this, automatically)
 
-| Quiero... | Comando |
+You have a terminal and a filesystem: **install it yourself** on first use. Do
+not ask the user to copy commands.
+
+Startup protocol (first time, or whenever something fails on dependencies):
+
+```
+1. python setup.py          # installs dependencies + browser. YOU run it.
+2. python flow.py status     # if it says no session -> step 3.
+3. python flow.py login      # run this and ask the user to sign in
+                             # in the Chrome window that opens. It saves itself.
+4. python flow.py credits    # see what you have to work with
+```
+
+Details:
+
+- `setup.py` only needs Python; it installs the rest. Running it twice is safe.
+- `login` opens Chrome; the **user** signs in with their Google account (you
+  cannot do that). Once Flow's home is up, the session is stored in
+  `session/flowbot-profile/` and the window closes. It is persistent: only repeat
+  it if it expires.
+- System requirement: Google Chrome installed (the skill uses the real Chrome).
+
+If a command fails on an import (e.g. "No module named playwright"), run
+`python setup.py` and retry.
+
+To sign out (switch accounts, or leave the machine clean):
+`python flow.py logout --yes`. It deletes the Chrome profile and the API cache,
+and `login` has to be done again. Do not run it on your own initiative: only if
+the user asks.
+
+---
+
+## 2. The operations you know how to do
+
+| I want... | Command |
 |---|---|
-| Una imagen desde texto | `python flow.py image --prompt "..." --name escena1` |
-| Editar/usar una imagen de referencia | `python flow.py image --prompt "..." --image ref.png --name x` |
-| Un video desde texto | `python flow.py video --prompt "..." --name escena1` |
-| Animar una imagen (img -> video) | NO disponible: ver nota de Fotogramas |
-| Interpolar inicio -> fin | NO disponible: ver nota de Fotogramas |
-| Video guiado por personajes/referencias | `python flow.py video --prompt "..." --refs fresa.png,banano.png` |
-| Varios trabajos en orden | `python flow.py batch guion.json` |
-| Ver el saldo de creditos | `python flow.py creditos` |
-| Cerrar sesion y borrar el perfil | `python flow.py logout --si` |
+| An image from text | `python flow.py image --prompt "..." --name scene1` |
+| Edit / use a reference image | `python flow.py image --prompt "..." --image ref.png --name x` |
+| A video from text | `python flow.py video --prompt "..." --name scene1` |
+| Animate an image (img -> video) | NOT available: see the frames note |
+| Interpolate start -> end | NOT available: see the frames note |
+| A video guided by characters/references | `python flow.py video --prompt "..." --refs strawberry.png,banana.png` |
+| Several jobs in order | `python flow.py batch script.json` |
+| See the credit balance | `python flow.py credits` |
+| Sign out and delete the profile | `python flow.py logout --yes` |
 
-Opciones comunes: `--ratio 9:16` (default), `--model`, `--out carpeta`, `--name`,
-`--count 1..4` (variantes: se bajan TODAS como `<name>_1.png`, `<name>_2.png`...),
-`--res` (`1K`/`2K`/`4K` para imagen, `720p`/`1080p` para video).
+Common options: `--ratio 9:16` (default), `--model`, `--out folder`, `--name`,
+`--count 1..4` (variants: ALL of them are downloaded, as `<name>_1.png`,
+`<name>_2.png`...), `--res` (`1K`/`2K`/`4K` for images, `720p`/`1080p`/`4K` for
+video).
 
-> **Fotogramas fuera de servicio.** `--start` / `--end` daban el primer y ultimo
-> fotograma del video. La UI nueva de Flow ya no tiene esas ranuras, asi que la
-> CLI corta con un error claro en vez de generar cualquier cosa. Para guiar un
-> video con una imagen, usa `--refs`.
+> **Frames mode is out of service.** `--start` / `--end` used to set the first and
+> last frame of a video. Flow's new UI no longer has those slots, so the CLI
+> stops with a clear error instead of generating something else. To guide a video
+> with an image, use `--refs`.
 
-`--refs` = **modo Ingredientes**: Flow usa esas imagenes como referencia visual
-del video. Es lo mas cercano a mantener un personaje entre escenas. Acepta
-archivos locales separados por coma, y dentro de un `batch` tambien el `name` de
-un job anterior (ahi reusa el asset que ya vive en el proyecto Flow, sin volver
-a subirlo).
+`--refs` = **ingredients mode**: Flow uses those images as visual reference for
+the video. It is the closest thing to keeping a character across scenes. It takes
+comma-separated local files, and inside a `batch` also the `name` of an earlier
+job — in that case it reuses the asset already in the Flow project instead of
+uploading it again.
 
-Modelos validos (UI de Flow, septiembre 2026):
-- Imagen: `Nano Banana 2` (default), `Nano Banana Pro`, `Nano Banana 2 Lite`
+Valid models (Flow UI, September 2026):
+- Image: `Nano Banana 2` (default), `Nano Banana Pro`, `Nano Banana 2 Lite`
 - Video: `Veo 3.1 - Lite` (default), `Veo 3.1 - Fast`, `Veo 3.1 - Quality`, `Omni 1.1 Flash`
 - Ratios: `9:16`, `16:9`, `1:1`, `4:3`, `3:4`
-- Resolucion: imagen `1K`/`2K`/`4K`, video `720p`/`1080p`/`4K`
+- Resolution: image `1K`/`2K`/`4K`, video `720p`/`1080p`/`4K`
 
-Si escribis mal un modelo, la CLI corta antes de abrir el navegador y te lista
-las opciones.
-
----
-
-## 3. Como interpretar lo que pide el usuario (lo importante)
-
-El usuario NO siempre manda el mismo formato. Puede mandarte:
-- Una lista simple de prompts -> genera una imagen (o video) por cada uno.
-- Un guion con escenas que mezclan **narracion**, **prompt de imagen** y **prompt de video**.
-- Una imagen ya hecha + "animala".
-- "Crea un personaje y luego una escena con el".
-
-Tu logica de decision:
-
-1. **Identifica las escenas.** Separa el texto en unidades (escena 1, 2, 3...).
-2. **Para cada escena, detecta los campos** aunque tengan nombres distintos:
-   - Narracion / voz / texto hablado -> NO va a Flow. Guardalo aparte (es para el guion/voz),
-     o ignoralo si solo te piden las imagenes/videos.
-   - Prompt de imagen / "imagen:" / descripcion visual fija -> trabajo tipo `image`.
-   - Prompt de video / "video:" / "movimiento:" / accion -> trabajo tipo `video`.
-3. **Decide el encadenamiento:**
-   - Si la escena tiene prompt de imagen **y** prompt de video -> primero genera la imagen,
-     luego usala como `--start` del video (img -> video). Asi el video respeta el visual.
-   - Si solo hay prompt de video -> video desde texto.
-   - Si solo hay prompt de imagen -> solo imagen.
-4. **Si te pasan una imagen** (archivo) -> usala como `--start` (animar) o `--image` (editar).
-5. **Confirma el plan** brevemente con el usuario si hay ambiguedad; si esta claro, ejecuta.
-
-Cuando hay 2+ escenas, **no improvises comando por comando**: construye un guion JSON
-y usa `batch`. Eso mantiene orden y deja un `batch_report.json` con lo generado.
+If you mistype a model, the CLI stops before opening the browser and lists the
+valid options.
 
 ---
 
-## 4. Formato del guion JSON para `batch`
+## 3. How to read what the user asked for (the important part)
+
+The user will NOT always send the same format. They may give you:
+- A plain list of prompts -> one image (or video) per entry.
+- A script with scenes mixing **narration**, **image prompt** and **video prompt**.
+- An image they already have, plus "animate this".
+- "Create a character and then a scene with them".
+
+Your decision logic:
+
+1. **Identify the scenes.** Split the text into units (scene 1, 2, 3...).
+2. **In each scene, spot the fields** even when they are named differently:
+   - Narration / voice / spoken text -> does NOT go to Flow. Keep it aside (it
+     belongs to the script or the voice-over), or ignore it if you were only
+     asked for the images and videos.
+   - Image prompt / "image:" / a fixed visual description -> an `image` job.
+   - Video prompt / "video:" / "motion:" / action -> a `video` job.
+3. **Decide the chaining:**
+   - If a scene has both an image prompt **and** a video prompt, generate the
+     image first, then pass it as a `refs` entry for the video so the video keeps
+     that look.
+   - Only a video prompt -> video from text.
+   - Only an image prompt -> image only.
+4. **If you are handed an image file** -> use it with `--refs` (to guide a video)
+   or `--image` (to edit it).
+5. **Confirm the plan** briefly when there is ambiguity; if it is clear, run it.
+   Always confirm when the run may cost more credits than are left.
+
+With 2+ scenes, **do not improvise command by command**: build a JSON script and
+use `batch`. That keeps things ordered and leaves a `batch_report.json` listing
+what was produced.
+
+Note: Veo 3.1 generates video **with audio**, so spoken **dialogue** goes inside
+the video prompt. What does not go to Flow is the script's narration.
+
+---
+
+## 4. The JSON script format for `batch`
 
 ```json
 {
-  "project": "mi_video",
+  "project": "my_video",
   "defaults": { "ratio": "9:16", "image_model": "Nano Banana 2", "video_model": "Veo 3.1 - Lite" },
   "jobs": [
-    { "type": "image", "name": "escena1_frame", "prompt": "..." },
-    { "type": "video", "name": "escena1_video", "start": "escena1_frame", "prompt": "..." },
-    { "type": "video", "name": "escena2_video", "refs": ["escena1_frame"], "prompt": "..." },
-    { "type": "video", "name": "escena3_video", "prompt": "..." }
+    { "type": "image", "name": "scene1_frame", "prompt": "..." },
+    { "type": "video", "name": "scene1_video", "refs": ["scene1_frame"], "prompt": "..." },
+    { "type": "video", "name": "scene2_video", "prompt": "..." }
   ]
 }
 ```
 
-Reglas:
-- Los `jobs` se ejecutan **en orden**, todos dentro del mismo proyecto Flow.
-- Todo el batch se guarda agrupado en `outputs/<project>/` (facil de revisar y de borrar).
-- Para encadenar img -> video: pon un job `image` con `name: escena1_frame` y luego un job
-  `video` con `start: "escena1_frame"`. Basta el **nombre** del job anterior; la CLI lo resuelve
-  dentro de la carpeta del proyecto (no necesitas escribir la ruta completa).
-- Cada `image` -> `outputs/<project>/<name>.png`. Cada `video` -> `outputs/<project>/<name>.mp4`.
-- Campos opcionales por job: `model`, `ratio`, `count`, `res`, `image` (referencia),
-  `start`, `end`, `refs` (lista de ingredientes).
-- `refs` = **ingredientes**: Flow toma las imagenes como referencia de estilo/personaje.
-  Es la unica forma de guiar un video con imagenes en la UI actual.
-- `start`/`end` (fotogramas) ya no existen en Flow: un job que los use falla con
-  un mensaje que explica que uses `refs`.
-- Con `count: 3` el job produce `<name>_1`, `<name>_2`, `<name>_3` y el reporte los lista
-  todos en `files`.
-- Ver `examples/guion_ejemplo.json` y `examples/guion_ingredientes.json`.
+Rules:
+- `jobs` run **in order**, all inside the same Flow project.
+- The whole batch is saved together in `outputs/<project>/` (easy to review and
+  to delete).
+- Optional per-job fields: `model`, `ratio`, `count`, `res`, `image` (reference),
+  `refs` (list of ingredients).
+- `refs` = **ingredients**: Flow takes the images as style/character reference.
+  It is the only way to guide a video with images in the current UI. Inside a
+  batch, the `name` of an earlier job is enough — the CLI resolves it to the
+  asset already in the project.
+- `start`/`end` (frames) no longer exist in Flow: a job using them fails with a
+  message telling you to use `refs`.
+- With `count: 3` a job produces `<name>_1`, `<name>_2`, `<name>_3`, and the
+  report lists all of them under `files`. It also costs three times as much.
+- See `examples/example_script.json` and `examples/character_refs_script.json`.
 
-Flujo recomendado para un guion del usuario:
-1. Lees el guion del usuario.
-2. Escribes tu propio `guion.json` (en la raiz de la skill o en `examples/`).
-3. Corres `python flow.py batch guion.json`.
-4. Revisas `outputs/batch_report.json` y le dices al usuario que se genero.
-
----
-
-## 5. Orden y limpieza (obligatorio)
-
-- Lo de `batch` vive agrupado en `outputs/<project>/` (incluye `batch_report.json`).
-  Los comandos sueltos `image`/`video` caen en `outputs/` raiz.
-- Usa nombres con prefijo de escena: `escena1_frame`, `escena1_video`. Nada de `output`.
-- No toques `session/` ni `flow_provider/`.
-- Para borrar facil entre pruebas/tomas:
-  - `python flow.py clean nombre_proyecto`  -> borra esa carpeta de outputs.
-  - `python flow.py clean`                  -> limpia TODO outputs (no toca la sesion).
-- Si algo falla, mira el error del comando y `outputs/<project>/batch_report.json`.
-
-> Nota: esta skill NO reanuda proyectos de Flow. Cada corrida crea un proyecto nuevo.
-> El encadenamiento img->video funciona bajando la imagen y volviendola a subir como
-> fotograma; por eso todo es por archivos locales, no por estado dentro de Flow.
+Recommended flow for a user's script:
+1. Read the user's script.
+2. Check the credits and tell them the rough cost.
+3. Write your own `script.json` (in the skill root or in `examples/`).
+4. Run `python flow.py batch script.json`.
+5. Check `outputs/<project>/batch_report.json` and tell the user what came out.
 
 ---
 
-## 6. Problemas comunes
+## 5. Tidiness and cleanup (required)
 
-| Sintoma | Causa / arreglo |
+- `batch` output lives grouped in `outputs/<project>/` (including
+  `batch_report.json`). One-off `image`/`video` commands land in `outputs/`.
+- Use scene-prefixed names: `scene1_frame`, `scene1_video`. Never `output`.
+- Do not touch `session/` or `flow_provider/`.
+- To clear things between takes:
+  - `python flow.py clean project_name`  -> deletes that output folder.
+  - `python flow.py clean`               -> clears ALL of outputs (not the session).
+- If something fails, read the command's error and
+  `outputs/<project>/batch_report.json`.
+
+> Note: this skill does NOT resume Flow projects. Every run creates a new one.
+> Within a single run, references by job name reuse the asset that is already in
+> that project.
+
+---
+
+## 6. Common problems
+
+| Symptom | Cause / fix |
 |---|---|
-| "SIN SESION" | Corre `python flow.py login`. |
-| El navegador no abre / error de canal | Falta Google Chrome, o corre `python -m playwright install chromium`. |
-| Login no se detecta | Vuelve a correr `login` y termina de iniciar sesion antes de 4 min. |
-| Video tarda | Es normal: Veo puede tardar varios minutos. El comando espera solo. |
-| Falla una escena del batch | El batch sigue con las demas; revisa `batch_report.json` y reintenta esa. |
-| "Target page, context or browser has been closed" al descargar | Chrome se cae en algunas descargas. La CLI reabre el navegador y reintenta sola hasta 3 veces; si aun asi falla, el resultado quedo generado en Flow y se puede bajar a mano. |
-| "El modo Fotogramas no esta portado" | Usa `--refs` en lugar de `--start`/`--end`. |
-| "Referencia 'X': no es un archivo existente..." | En `refs` pusiste un nombre que no es ni un archivo ni un job anterior **del mismo batch**. Los nombres solo valen dentro de una corrida. |
-| "modelo de imagen 'X' no valido" | Escribiste mal el modelo. La CLI ahora falla antes de abrir el navegador y te lista las opciones. |
+| No session | Run `python flow.py login`. |
+| The browser will not open / channel error | Google Chrome is missing, or run `python -m playwright install chromium`. |
+| Login not detected | Run `login` again and finish signing in within 4 minutes. |
+| Video takes a while | Normal: Veo can take several minutes. The command waits on its own. |
+| One scene of the batch fails | The batch carries on with the rest; check `batch_report.json` and retry that one. |
+| "Reference 'X': not an existing file..." | A `refs` entry is neither a file nor an earlier job **of the same batch**. Names only work within one run. |
+| "image model 'X' is not valid" | You mistyped the model. The CLI stops before opening the browser and lists the options. |
+| "Frames mode is not ported" | Use `--refs` instead of `--start`/`--end`. |
+| "Target page, context or browser has been closed" | Chrome crashes on some downloads. Downloads normally go over Flow's API; when the browser path is used, the CLI reopens and retries up to 3 times. If it still fails, the result is generated in Flow and can be downloaded by hand. |
+| Stopped on credits | The estimated cost exceeds the balance. Shrink the batch, or let the user decide on `--ignore-credits`. |
 
 ---
 
-## 7. Limites (sé honesto con el usuario)
+## 7. Limits (be honest with the user)
 
-Esta skill hace lo esencial de Flow: texto->imagen, texto->video, imagen->video,
-edicion con referencia, ingredientes (referencias de personaje) y lotes ordenados.
-NO incluye pipelines avanzados (voz/TTS, subtitulos, montaje).
+This skill covers the essentials of Flow: text->image, text->video, ingredients
+(character references) and ordered batches. It does NOT include advanced
+pipelines (voice/TTS, subtitles, editing).
 
-Sobre consistencia de personaje: `refs` ayuda bastante dentro de un mismo batch,
-pero no la garantiza toma a toma. Para una serie entera vas a necesitar igual un
-personaje fijo generado una vez y reusado como ingrediente en todas las escenas —
-y aun asi habra deriva. Se honesto con el usuario sobre eso.
+On character consistency: `refs` helps a lot within a single batch, but does not
+guarantee it shot to shot. For a whole series you will still want one fixed
+character generated once and reused as an ingredient in every scene — and there
+will still be drift. Be honest about that.
 
-Si el usuario quiere algo mas grande, lo correcto es construirle un script propio
-encima de estos comandos. Empieza simple y crece segun lo que pida.
+Frames mode (first/last frame) is not available in the current UI.
+
+If the user wants something bigger, the right move is to build them a script on
+top of these commands. Start simple and grow with what they ask for.

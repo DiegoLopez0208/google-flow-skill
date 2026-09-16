@@ -1,11 +1,11 @@
 """
-Escritura y envio del prompt en Google Flow.
+Typing and submitting the prompt in Google Flow.
 
-UI nueva (mapeada 2026-09-16): el editor es ProseMirror dentro de
-flow-rich-text-editor, y el boton de enviar se identifica por aria-label
-("Iniciar generacion"), no por el nombre del icono.
+New UI (mapped 2026-09-16): the editor is a ProseMirror instance inside
+flow-rich-text-editor, and the submit button is found by its aria-label
+("Iniciar generacion"), not by an icon name.
 """
-from .browser import cerrar_overlays, get_page
+from .browser import close_overlays, get_page
 
 SEL_PROMPT_BOX = "flow-base-prompt-box"
 SEL_PROMPT = f'{SEL_PROMPT_BOX} div[contenteditable="true"]'
@@ -13,34 +13,34 @@ SEL_SUBMIT = 'button[aria-label*="niciar generaci"]'
 
 
 async def submit_prompt(prompt: str, typing_delay_ms: int = 5) -> None:
-    """Escribe el prompt y envia.
+    """Type the prompt and submit it.
 
-    El delay de tecleo es bajo a proposito: con 30ms un prompt de 800
-    caracteres se llevaba 24 segundos solo escribiendo.
+    The typing delay is deliberately low: at 30ms an 800-character prompt spent
+    24 seconds just being typed out.
     """
     page = await get_page()
-    await cerrar_overlays(page)
+    await close_overlays(page)
 
     box = page.locator(SEL_PROMPT)
     if await box.count() == 0:
-        raise RuntimeError("No se encontro el cuadro de instruccion de Flow.")
+        raise RuntimeError("Could not find Flow's prompt box.")
     await box.first.click()
     await page.keyboard.press("Control+a")
     await page.keyboard.type(prompt, delay=typing_delay_ms)
     await page.wait_for_timeout(500)
 
-    # El boton aparece recien cuando el editor tiene texto, y un overlay a medio
-    # cerrar lo tapa: se espera y se reintenta en vez de fallar de una.
+    # The button only shows up once the editor holds text, and a half-closed
+    # overlay can cover it, so wait and retry instead of failing right away.
     submit = page.locator(SEL_SUBMIT)
-    for intento in range(3):
+    for _ in range(3):
         try:
             await submit.first.wait_for(state="visible", timeout=6000)
             await submit.first.click()
             return
         except Exception:
-            await cerrar_overlays(page)
+            await close_overlays(page)
             await box.first.click()
             await page.wait_for_timeout(800)
     raise RuntimeError(
-        "No se encontro el boton de enviar (Iniciar generacion) tras tres intentos."
+        "Could not find the submit button (Iniciar generacion) after three tries."
     )

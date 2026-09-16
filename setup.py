@@ -1,15 +1,16 @@
 #!/usr/bin/env python
 """
-setup.py - Instalacion automatica de la skill Google Flow.
+setup.py - automatic install for the Google Flow skill.
 
-Pensado para que lo ejecute el propio agente:  python setup.py
+Meant to be run by the agent itself:  python setup.py
 
-Hace:
+It does:
   1. pip install -r requirements.txt
   2. playwright install chromium
 
-NO hace login (eso requiere TU cuenta de Google). Al final te indica el paso.
-Solo usa libreria estandar para poder correr antes de instalar nada.
+It does NOT log in (that needs YOUR Google account). The last line tells you
+the next step. Uses only the standard library so it can run before anything is
+installed.
 """
 import subprocess
 import sys
@@ -24,7 +25,7 @@ def run(cmd: list[str]) -> int:
 
 
 def main() -> int:
-    print("=== Instalacion Google Flow Skill ===")
+    print("=== Google Flow Skill install ===")
     steps = [
         [sys.executable, "-m", "pip", "install", "-r", str(BASE / "requirements.txt")],
         [sys.executable, "-m", "playwright", "install", "chromium"],
@@ -32,12 +33,13 @@ def main() -> int:
     for cmd in steps:
         code = run(cmd)
         if code != 0:
-            print(f"\nERROR en: {' '.join(cmd)} (codigo {code}). Revisa el mensaje de arriba.")
+            print(f"\nFAILED at: {' '.join(cmd)} (exit {code}). See the message above.")
             return code
 
-    print("\nOK: dependencias instaladas.")
-    print("Siguiente paso (una sola vez): python flow.py login")
-    print("\n(psst: prueba 'python flow.py nuro')  --  hecho por NURO para BRPL")
+    print("\nOK: dependencies installed.")
+    print("Next step (only once): python flow.py login")
+    print("Then check your balance with: python flow.py credits")
+    print("\n(psst: try 'python flow.py nuro')  --  made by NURO for BRPL")
     return 0
 
 

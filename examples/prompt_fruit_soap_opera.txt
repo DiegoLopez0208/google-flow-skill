@@ -1,0 +1,42 @@
+==========================================================================
+ READY-TO-PASTE PROMPT FOR YOUR AGENT (the "fruit soap opera" case)
+ Copy from the line below to the end and paste it into your agent's chat.
+==========================================================================
+
+Use the Google Flow skill in this folder. I want you to produce a "fruit soap
+opera": a vertical (9:16) short in the style of a viral telenovela, with fruit
+as the characters. The video model is Veo 3.1, which generates VIDEO + AUDIO, so
+the spoken DIALOGUE goes INSIDE each scene's video prompt (not as separate
+narration). Your job is to generate and download the final VIDEOS, clearly named
+and ordered; I will stitch them together in an editor afterwards.
+
+FIRST, BEFORE ANYTHING: run `python flow.py credits` and tell me what the run
+will roughly cost. A Veo video costs about 10x an image, so if the balance is low
+say so up front instead of starting and failing halfway through.
+
+CHARACTERS (keep them consistent across every scene):
+- Strawberry: a red strawberry with big expressive eyes, dramatic, long lashes.
+- Banana: a charming banana, confident smile, one eyebrow raised.
+- Lemon: a green lemon with a villain's face and a crooked smile.
+Global visual style: Pixar-style 3D, vivid colors, sunny kitchen background,
+soft cinematic lighting, 9:16 vertical.
+
+DIALOGUE / AUDIO RULE:
+Write each video prompt so it describes the shot AND the spoken line, e.g.:
+  "The strawberry turns to the camera, eyes welling up, and says: 'I knew you
+   were lying to me!'. Soft cinematic lighting, slow push-in."
+
+HOW TO KEEP THE CHARACTERS CONSISTENT:
+1. First generate ONE image per character (full body, plain background).
+2. Then, for every scene, pass those images as `refs` (ingredients mode) so the
+   video keeps the same character.
+3. Inside a batch, `refs` can be just the name of the image job.
+
+WHAT I WANT:
+- 4 scenes, 8 seconds each, with a clear arc: betrayal, confrontation, a twist
+  and an ending that begs for a part two.
+- Write the JSON script yourself and run it with `batch`, so everything lands
+  grouped in `outputs/<project>/`.
+- At the end, show me `batch_report.json` and tell me which file is which scene.
+
+Ask me before spending anything if the estimated cost is above the balance.

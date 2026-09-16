@@ -1,23 +1,30 @@
 """
-Lifecycle del browser Playwright para Google Flow.
-startup() abre Chrome con el perfil persistente; shutdown() lo cierra.
-Ambos se llaman una vez por comando de flow.py.
+Playwright browser lifecycle for Google Flow.
+
+startup() opens Chrome with the persistent profile; shutdown() closes it. Both
+run once per flow.py command.
+
+It also watches Flow's network responses to collect asset ids: images do not
+expose theirs in the DOM, and querying Flow's API ourselves arrives too late
+because the backend takes a few seconds to index a fresh result.
 """
 import asyncio
 import os
 import re
 import sys
 from pathlib import Path
+
 from playwright.async_api import async_playwright, BrowserContext, Page, Playwright
 
 from . import settings
 
-# --no-sandbox solo hace falta en contenedores Linux corriendo como root; en
-# Windows/macOS baja el sandbox de Chrome sin ganar nada.
+# --no-sandbox is only needed in Linux containers running as root; on
+# Windows/macOS it weakens Chrome's sandbox for nothing.
 _CHROME_ARGS = [
     "--disable-blink-features=AutomationControlled",
-    # Playwright fuerza render por software y el proceso GPU se cae al descargar
-    # (el perfil quedaba con exit_type "Crashed"). Sin GPU no hay a quien matar.
+    # Playwright already forces software rendering, and the GPU process was the
+    # one dying during downloads (the profile was left marked "Crashed"). With
+    # no GPU process there is nothing left to crash.
     "--disable-gpu",
     "--disable-software-rasterizer",
     "--safebrowsing-disable-download-protection",
@@ -25,13 +32,26 @@ _CHROME_ARGS = [
 if sys.platform.startswith("linux"):
     _CHROME_ARGS.append("--no-sandbox")
 
+_playwright: Playwright | None = None
+_context: BrowserContext | None = None
+_page: Page | None = None
+_guard_page: Page | None = None
+_lock = asyncio.Lock()
 
-def _sanear_perfil() -> None:
-    """Deja el perfil listo para un arranque limpio.
+# Asset ids seen in the responses Flow sends the browser, in order of appearance.
+_seen_asset_ids: list[str] = []
 
-    Si Chrome se cayo, el perfil queda marcado como "Crashed" y al reabrir
-    aparece el globo de restaurar pestanas, que se come clicks. De paso se fija
-    que las descargas no pregunten donde guardar.
+RE_UUID = re.compile(
+    r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
+)
+
+
+def _sanitize_profile() -> None:
+    """Leave the profile ready for a clean start.
+
+    After a crash Chrome marks the profile "Crashed" and reopens with the
+    restore-tabs bubble, which eats clicks. This also stops downloads from asking
+    where to save and turns off Safe Browsing's download check.
     """
     import json
 
@@ -39,39 +59,28 @@ def _sanear_perfil() -> None:
     if not prefs.exists():
         return
     try:
-        datos = json.loads(prefs.read_text(encoding="utf-8"))
+        data = json.loads(prefs.read_text(encoding="utf-8"))
     except Exception:
         return
-    perfil = datos.setdefault("profile", {})
-    perfil["exit_type"] = "Normal"
-    perfil["exited_cleanly"] = True
-    descargas = datos.setdefault("download", {})
-    descargas["prompt_for_download"] = False
-    descargas["directory_upgrade"] = True
-    # La verificacion de descargas de Safe Browsing es la sospechosa de tumbar
-    # el proceso al bajar archivos de flow-content.google.
-    seguridad = datos.setdefault("safebrowsing", {})
-    seguridad["enabled"] = False
-    seguridad["disable_download_protection"] = True
+    profile = data.setdefault("profile", {})
+    profile["exit_type"] = "Normal"
+    profile["exited_cleanly"] = True
+    downloads = data.setdefault("download", {})
+    downloads["prompt_for_download"] = False
+    downloads["directory_upgrade"] = True
+    # Safe Browsing's download verification is the suspect behind the browser
+    # dying while pulling files from flow-content.google.
+    safety = data.setdefault("safebrowsing", {})
+    safety["enabled"] = False
+    safety["disable_download_protection"] = True
     try:
-        prefs.write_text(json.dumps(datos), encoding="utf-8")
+        prefs.write_text(json.dumps(data), encoding="utf-8")
     except Exception:
         pass
 
-_playwright: Playwright | None = None
-_context: BrowserContext | None = None
-_page: Page | None = None
-_guardia: Page | None = None
-
-# UUIDs de assets vistos en las respuestas que Flow le manda al navegador.
-# Es la via mas fiable de conocerlos: las imagenes no los exponen en el DOM y
-# la API propia tarda en indexarlos.
-_assets_vistos: list[str] = []
-_lock = asyncio.Lock()
-
 
 async def startup() -> None:
-    global _playwright, _context, _page
+    global _playwright
     _playwright = await async_playwright().start()
     try:
         await _launch()
@@ -81,7 +90,7 @@ async def startup() -> None:
 
 
 async def _launch() -> None:
-    global _context, _page
+    global _context, _page, _guard_page
 
     session_file = settings.FLOW_SESSION_FILE
     use_session = bool(session_file and Path(session_file).exists())
@@ -98,7 +107,7 @@ async def _launch() -> None:
             viewport={"width": 1280, "height": 900},
         )
     else:
-        # Limpieza preventiva de archivos de bloqueo (locks) de Chrome antes de arrancar
+        # Clear stale Chrome lock files before starting.
         profile_path = settings.FLOW_CHROME_PROFILE
         if profile_path:
             p_dir = Path(profile_path)
@@ -107,13 +116,14 @@ async def _launch() -> None:
                     lock_file = p_dir / lock_name
                     if lock_file.exists():
                         try:
-                            # En Windows a veces SingletonLock es un archivo, en Unix es un symlink
+                            # On Windows SingletonLock is sometimes a file, on
+                            # Unix a symlink.
                             lock_file.unlink(missing_ok=True)
                         except Exception:
-                            # Ignorar si no se puede borrar porque está en uso real
+                            # Ignore it if the profile really is in use.
                             pass
-                            
-        _sanear_perfil()
+
+        _sanitize_profile()
         _context = await _playwright.chromium.launch_persistent_context(
             user_data_dir=settings.FLOW_CHROME_PROFILE or "/tmp/flow-profile",
             headless=settings.FLOW_HEADLESS,
@@ -125,45 +135,46 @@ async def _launch() -> None:
 
     _page = _context.pages[0] if _context.pages else await _context.new_page()
 
-    # Pestana de guardia. Flow dispara algunas descargas en una pestana nueva que
-    # Chrome cierra al terminar; si esa era la unica del contexto, se cierra el
-    # navegador entero y la descarga se pierde a medio guardar.
-    global _guardia
-    _guardia = await _context.new_page()
-    await _guardia.goto("about:blank")
+    # Guard tab. Flow fires some downloads in a new tab that Chrome closes when
+    # it finishes; if that had been the context's only tab, the whole browser
+    # would go down and the download would be lost half-saved.
+    _guard_page = await _context.new_page()
+    await _guard_page.goto("about:blank")
     await _page.bring_to_front()
 
-    _assets_vistos.clear()
-    _page.on("response", _espiar_respuesta)
+    _seen_asset_ids.clear()
+    _page.on("response", _watch_response)
 
     if os.getenv("FLOW_DEBUG"):
-        import traceback
-        _page.on("close", lambda _: print("  [debug] se cerro la pagina"))
-        _context.on("close", lambda _: print("  [debug] se cerro el contexto"))
-        _page.on("crash", lambda _: print("  [debug] la pagina CRASHEO"))
-        _context.on("page", lambda pg: print(f"  [debug] pagina nueva: {pg.url[:80]}"))
+        _page.on("close", lambda _: print("  [debug] page closed"))
+        _context.on("close", lambda _: print("  [debug] context closed"))
+        _page.on("crash", lambda _: print("  [debug] page CRASHED"))
+        _context.on("page", lambda pg: print(f"  [debug] new page: {pg.url[:80]}"))
 
 
 async def shutdown() -> None:
-    """Cierra contexto y Playwright. Si el cierre del contexto falla igual se
-    para Playwright: si no, queda un proceso node colgado."""
-    global _playwright, _context, _page
+    """Close the context and stop Playwright.
+
+    Playwright is stopped even when closing the context fails: otherwise a node
+    process is left hanging around.
+    """
+    global _playwright, _context, _page, _guard_page
     try:
         if _context:
             await _context.close()
     except Exception as e:
-        print(f"  aviso: fallo al cerrar el contexto del navegador: {e}")
+        print(f"  note: could not close the browser context cleanly: {e}")
     finally:
         try:
             if _playwright:
                 await _playwright.stop()
         finally:
-            _playwright = _context = _page = _guardia = None
+            _playwright = _context = _page = _guard_page = None
 
 
 async def get_page() -> Page:
     if _page is None:
-        raise RuntimeError("Flow browser no iniciado. Llama startup() primero.")
+        raise RuntimeError("Flow browser not started. Call startup() first.")
     return _page
 
 
@@ -171,14 +182,24 @@ def get_lock() -> asyncio.Lock:
     return _lock
 
 
-async def cerrar_overlays(page) -> None:
-    """Cierra menus y paneles flotantes de Angular Material.
+def browser_alive() -> bool:
+    """True while the page is still usable."""
+    if _page is None:
+        return False
+    try:
+        return not _page.is_closed()
+    except Exception:
+        return False
 
-    Sin esto, el submenu que queda abierto tras una descarga tapa la barra de
-    instruccion y la operacion siguiente falla con un error enganoso.
 
-    Solo cuentan los paneles VISIBLES: Angular deja panes vacios en el DOM, y
-    tomarlos por menus abiertos disparaba Escapes y clicks a ciegas.
+async def close_overlays(page) -> None:
+    """Close Angular Material menus and floating panels.
+
+    Without this, the submenu left open by a download covers the prompt bar and
+    the next operation fails with a misleading error.
+
+    Only VISIBLE panels count: Angular keeps empty panes in the DOM, and taking
+    those for open menus used to fire stray Escapes and blind clicks.
     """
     panes = page.locator(".cdk-overlay-pane:visible")
     for _ in range(3):
@@ -191,38 +212,26 @@ async def cerrar_overlays(page) -> None:
         await page.wait_for_timeout(400)
 
 
-def navegador_vivo() -> bool:
-    """True si la pagina sigue utilizable."""
-    if _page is None:
-        return False
-    try:
-        return not _page.is_closed()
-    except Exception:
-        return False
-
-
-def _espiar_respuesta(resp) -> None:
-    """Anota los UUIDs de asset que aparecen en las respuestas de Flow."""
+def _watch_response(resp) -> None:
+    """Record asset ids appearing in Flow's responses."""
     if "batchexecute" not in resp.url:
         return
 
-    async def leer():
+    async def read():
         try:
-            texto = await resp.text()
+            text = await resp.text()
         except Exception:
             return
-        for uuid in re.findall(
-            r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", texto
-        ):
-            if uuid not in _assets_vistos:
-                _assets_vistos.append(uuid)
+        for asset_id in RE_UUID.findall(text):
+            if asset_id not in _seen_asset_ids:
+                _seen_asset_ids.append(asset_id)
 
     try:
-        asyncio.get_running_loop().create_task(leer())
+        asyncio.get_running_loop().create_task(read())
     except RuntimeError:
         pass
 
 
-def uuids_vistos() -> list[str]:
-    """UUIDs observados en el trafico, en orden de aparicion."""
-    return list(_assets_vistos)
+def seen_asset_ids() -> list[str]:
+    """Asset ids observed in the traffic, in order of appearance."""
+    return list(_seen_asset_ids)

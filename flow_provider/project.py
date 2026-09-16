@@ -1,17 +1,18 @@
 """
-Creacion y navegacion de proyectos en Google Flow.
+Creating and navigating Flow projects.
 
-Flow se mudo de labs.google/fx/.../tools/flow a flow.google.com (2026).
-El dominio viejo redirige, pero apuntar directo evita un salto y un timeout.
+Flow moved from labs.google/fx/.../tools/flow to flow.google.com in 2026. The old
+domain still redirects, but pointing straight at the new one saves a hop and a
+timeout.
 """
 from .browser import get_page
 
 FLOW_BASE_URL = "https://flow.google.com"
 
-# flow-base-prompt-box es el custom element de la barra de instruccion: si esta
-# en el DOM, el proyecto termino de renderizar.
-SEL_LISTO = "flow-base-prompt-box"
-SEL_NUEVO_PROYECTO = (
+# flow-base-prompt-box is the prompt bar's custom element: once it is in the DOM,
+# the project has finished rendering.
+SEL_READY = "flow-base-prompt-box"
+SEL_NEW_PROJECT = (
     'button:has-text("Proyecto nuevo"), '
     'button:has-text("New project"), '
     'button[aria-label*="royecto nuevo"]'
@@ -19,7 +20,7 @@ SEL_NUEVO_PROYECTO = (
 
 
 async def _dismiss_fullscreen_viewer(page) -> None:
-    """Escape para cerrar cualquier visor que se haya abierto sin querer."""
+    """Press Escape to close any viewer that opened by accident."""
     try:
         await page.keyboard.press("Escape")
         await page.wait_for_timeout(800)
@@ -28,9 +29,10 @@ async def _dismiss_fullscreen_viewer(page) -> None:
 
 
 async def ensure_all_media_tab(page) -> None:
-    """Deja el panel izquierdo en 'Todos los elementos'.
+    """Leave the left panel showing all media.
 
-    En la UI nueva son mat-list-item, no botones con icono dashboard.
+    In the new UI those entries are mat-list-item elements, not buttons with a
+    dashboard icon.
     """
     try:
         tab = page.locator('mat-list-item:has-text("dashboard")')
@@ -44,12 +46,12 @@ async def ensure_all_media_tab(page) -> None:
 
 
 async def create_project() -> tuple[str, str]:
-    """Crea un proyecto nuevo. Retorna (project_uuid, project_url)."""
+    """Create a new project. Returns (project_id, project_url)."""
     page = await get_page()
     await page.goto(FLOW_BASE_URL, wait_until="domcontentloaded")
     await page.wait_for_timeout(4000)
 
-    # Cerrar banner/modal de novedades si aparece.
+    # Dismiss the what's-new banner or modal if one shows up.
     for sel in ['button[aria-label*="escartar banner"]', 'button[aria-current="true"]']:
         try:
             b = page.locator(sel)
@@ -59,30 +61,30 @@ async def create_project() -> tuple[str, str]:
         except Exception:
             pass
 
-    btn = page.locator(SEL_NUEVO_PROYECTO)
+    btn = page.locator(SEL_NEW_PROJECT)
     await btn.first.wait_for(state="visible", timeout=20000)
     await btn.first.click()
 
     await page.wait_for_url("**/project/**", timeout=20000)
     project_url = page.url
-    project_uuid = project_url.rstrip("/").split("/")[-1].split("?")[0]
+    project_id = project_url.rstrip("/").split("/")[-1].split("?")[0]
 
-    # Sin esta espera el SPA todavia no pinto la barra de instruccion.
-    await page.wait_for_selector(SEL_LISTO, timeout=25000)
+    # Without this wait the SPA has not painted the prompt bar yet.
+    await page.wait_for_selector(SEL_READY, timeout=25000)
     await page.wait_for_timeout(2500)
 
     await _dismiss_fullscreen_viewer(page)
     await ensure_all_media_tab(page)
-    return project_uuid, project_url
+    return project_id, project_url
 
 
-async def navigate_to_project(project_uuid: str) -> None:
-    """Navega a un proyecto existente."""
+async def navigate_to_project(project_id: str) -> None:
+    """Open an existing project."""
     page = await get_page()
-    target = f"{FLOW_BASE_URL}/project/{project_uuid}"
+    target = f"{FLOW_BASE_URL}/project/{project_id}"
     if not page.url.startswith(target):
         await page.goto(target, wait_until="domcontentloaded")
-        await page.wait_for_selector(SEL_LISTO, timeout=25000)
+        await page.wait_for_selector(SEL_READY, timeout=25000)
         await page.wait_for_timeout(3000)
 
     await _dismiss_fullscreen_viewer(page)

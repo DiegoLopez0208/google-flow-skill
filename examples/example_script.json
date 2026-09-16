@@ -8,18 +8,20 @@
   "jobs": [
     {
       "type": "image",
-      "name": "escena1_frame",
+      "name": "scene1_frame",
       "prompt": "A lone astronaut standing on a red desert planet at sunset, cinematic, vertical composition"
     },
     {
       "type": "video",
-      "name": "escena1_video",
-      "start": "escena1_frame",
-      "prompt": "The astronaut slowly turns toward the camera as wind blows red dust, subtle motion"
+      "name": "scene1_video",
+      "prompt": "The astronaut slowly turns toward the camera as wind blows red dust, subtle motion",
+      "refs": [
+        "scene1_frame"
+      ]
     },
     {
       "type": "video",
-      "name": "escena2_video",
+      "name": "scene2_video",
       "prompt": "Wide cinematic shot of two moons rising over the red desert horizon, slow pan"
     }
   ]

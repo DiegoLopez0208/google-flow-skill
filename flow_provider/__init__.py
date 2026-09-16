@@ -1,30 +1,32 @@
 """
-flow_provider — automatizacion de Google Flow con Playwright.
+flow_provider -- Google Flow automation.
 
-Portado a la UI de flow.google.com (Angular Material) el 2026-09-16.
+Ported to the flow.google.com UI (Angular Material) on 2026-09-16.
 
-La API util es esta, y la orquestacion vive en flow.py:
+The useful API is this, and the orchestration lives in flow.py:
 
-    startup / shutdown            ciclo de vida del navegador
-    create_project                proyecto nuevo (uno por corrida)
-    select_image_mode / _video_   modelo, ratio y cantidad
-    upload_media                  sube un archivo local y lo adjunta
-    add_asset_to_prompt           reusa un asset del proyecto como referencia
-    snapshot_assets               UUIDs presentes antes de generar
-    submit_prompt                 escribe y envia
-    wait_for_new_assets           espera los UUIDs nuevos
-    download_assets               los baja por UUID
+    startup / shutdown            browser lifecycle
+    create_project                new project (one per run)
+    select_image_mode / _video_   model, ratio and count
+    read_credits                  credit balance (generating costs credits)
+    upload_media                  upload a local file and attach it
+    add_asset_to_prompt           reuse a project asset as a reference
+    snapshot_assets               what is on the canvas before generating
+    submit_prompt                 type and submit
+    wait_for_new_assets           wait for the new results
+    seen_asset_ids                asset ids observed in Flow's traffic
+    api.download                  fetch a result over HTTP, no browser
 """
 from . import api
 from .credits import (
-    COSTO_ESTIMADO,
-    aviso_de_pocos_creditos,
-    estimar_costo,
-    leer_creditos,
+    ESTIMATED_COST,
+    estimate_cost,
+    low_credits_notice,
+    read_credits,
 )
 from .browser import (
-    navegador_vivo,
-    uuids_vistos,
+    browser_alive,
+    seen_asset_ids,
     startup,
     shutdown,
     get_page,
@@ -55,8 +57,8 @@ from .download import (
 
 __all__ = [
     "api",
-    "leer_creditos", "aviso_de_pocos_creditos", "estimar_costo", "COSTO_ESTIMADO",
-    "startup", "shutdown", "get_page", "get_lock", "navegador_vivo", "uuids_vistos",
+    "read_credits", "low_credits_notice", "estimate_cost", "ESTIMATED_COST",
+    "startup", "shutdown", "get_page", "get_lock", "browser_alive", "seen_asset_ids",
     "create_project", "navigate_to_project",
     "select_image_mode", "select_video_mode",
     "upload_media", "upload_standalone_image",

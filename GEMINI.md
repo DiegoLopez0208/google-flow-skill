@@ -1,44 +1,48 @@
 # GEMINI.md - Google Flow Skill
 
-Tienes UNA habilidad en esta carpeta: **manejar Google Flow** (labs.google) para
-generar y descargar imagenes y videos. Lo haces con UNA sola herramienta: `flow.py`.
+You have ONE skill in this folder: **driving Google Flow** (flow.google.com) to
+generate and download images and videos. You do it with a single tool:
+`flow.py`.
 
-## Empieza aqui
-1. Lee `skills/google-flow/SKILL.md`: es tu manual completo. Ignora `flow_provider/` (motor interno).
-2. **Instalate tu solo** la primera vez: ejecuta `python setup.py` (instala dependencias y
-   el navegador). Tienes terminal; no se lo pidas al usuario.
-3. Luego `python flow.py status`. Si dice "SIN SESION", ejecuta `python flow.py login` y pide
-   al usuario que inicie sesion en la ventana de Chrome (ese paso lo hace el humano).
-4. Tu trabajo es pensar el plan y ejecutar comandos `python flow.py ...`.
-   NO escribas codigo de navegador tu mismo, ya esta resuelto.
+## Start here
+1. Read `skills/google-flow/SKILL.md`: that is your complete manual. Ignore
+   `flow_provider/` (internal engine).
+2. **Install it yourself** the first time: run `python setup.py` (installs the
+   dependencies and the browser). You have a terminal; do not ask the user.
+3. Then `python flow.py status`. If there is no session, run
+   `python flow.py login` and ask the user to sign in in the Chrome window (that
+   step is the human's).
+4. Your job is to plan and then run `python flow.py ...` commands. Do NOT write
+   browser code yourself; it is already solved.
 
-## Comandos que usas
+## Commands you use
 ```
-python flow.py creditos
+python flow.py credits
 python flow.py login
 python flow.py status
-python flow.py image --prompt "DESCRIPCION VISUAL EN INGLES" --name escena1
-python flow.py video --prompt "MOVIMIENTO/ACCION EN INGLES" --name escena1
-python flow.py video --prompt "..." --start outputs/escena1.png --name escena1_vid
-python flow.py video --prompt "..." --refs fresa.png,banano.png --name escena1_vid
-python flow.py batch guion.json
-python flow.py clean nombre_proyecto
+python flow.py image --prompt "VISUAL DESCRIPTION IN ENGLISH" --name scene1
+python flow.py video --prompt "MOTION/ACTION IN ENGLISH" --name scene1
+python flow.py video --prompt "..." --refs character.png --name scene1_vid
+python flow.py batch script.json
+python flow.py clean project_name
+python flow.py logout --yes
 ```
 
-## Como pensar
-- Primero los creditos: `python flow.py creditos`. Generar cuesta, y un video de Veo
-  cuesta ~10x una imagen. Si el saldo esta bajo, decilo antes de armar el guion.
-- El usuario te pasa una lista de prompts o un guion con escenas. Separa cada escena.
-- En cada escena: si hay prompt de imagen Y de video -> primero imagen, luego anima esa
-  imagen como `--start` del video. Si solo hay uno, haz solo ese.
-- La narracion/voz NO se manda a Flow. (Ojo: Veo 3.1 genera audio, asi que el DIALOGO
-  hablado SI va dentro del prompt de video. Lo que no va es la narracion de guion.)
-- Personajes que se repiten entre escenas: generalos una vez como imagen y pasalos como
-  `refs` (ingredientes) en cada video; dentro de un batch alcanza con el `name` del job.
-- Para varias escenas: escribe un `guion.json` (ver `examples/guion_ejemplo.json`) y usa `batch`.
-  El batch se guarda en `outputs/<project>/`. Para encadenar, el `start` del video puede ser
-  solo el `name` del job de imagen anterior (la CLI lo resuelve sola).
-- IMPORTANTE: la skill NO reanuda proyectos de Flow; cada corrida crea un proyecto nuevo y el
-  encadenamiento img->video se hace bajando la imagen y volviendola a subir.
-- Revisa `outputs/<project>/batch_report.json` al final.
-- No prometas mas de lo que la skill hace (lee la seccion 7 de `SKILL.md`).
+## How to think
+- Credits first: `python flow.py credits`. Generating costs, and a Veo video runs
+  ~10x an image. If the balance is low, say so before building the script.
+- The user hands you a list of prompts or a script with scenes. Split the scenes.
+- Per scene: if there is both an image prompt AND a video prompt, generate the
+  image first, then pass it in `refs` for the video. If there is only one, do
+  only that one.
+- Narration does NOT go to Flow. (But Veo 3.1 generates audio, so spoken
+  dialogue DOES belong inside the video prompt.)
+- Characters repeating across scenes: generate them once as images and pass them
+  as `refs` (ingredients); inside a batch the earlier job's `name` is enough.
+- For several scenes: write a `script.json` (see `examples/example_script.json`)
+  and use `batch`. Output is grouped in `outputs/<project>/`.
+- IMPORTANT: the skill does NOT resume Flow projects; every run creates a new
+  one. `--start`/`--end` (frames) is not available in the current UI: use
+  `--refs`.
+- Check `outputs/<project>/batch_report.json` at the end.
+- Do not promise more than the skill does (read section 7 of the manual).
