@@ -64,8 +64,8 @@ corre `python setup.py` y reintenta.
 | Una imagen desde texto | `python flow.py image --prompt "..." --name escena1` |
 | Editar/usar una imagen de referencia | `python flow.py image --prompt "..." --image ref.png --name x` |
 | Un video desde texto | `python flow.py video --prompt "..." --name escena1` |
-| Animar una imagen (img -> video) | `python flow.py video --prompt "..." --start frame.png --name x` |
-| Interpolar inicio -> fin | `python flow.py video --prompt "..." --start a.png --end b.png` |
+| Animar una imagen (img -> video) | NO disponible: ver nota de Fotogramas |
+| Interpolar inicio -> fin | NO disponible: ver nota de Fotogramas |
 | Video guiado por personajes/referencias | `python flow.py video --prompt "..." --refs fresa.png,banano.png` |
 | Varios trabajos en orden | `python flow.py batch guion.json` |
 
@@ -73,16 +73,25 @@ Opciones comunes: `--ratio 9:16` (default), `--model`, `--out carpeta`, `--name`
 `--count 1..4` (variantes: se bajan TODAS como `<name>_1.png`, `<name>_2.png`...),
 `--res` (`1K`/`2K`/`4K` para imagen, `720p`/`1080p` para video).
 
+> **Fotogramas fuera de servicio.** `--start` / `--end` daban el primer y ultimo
+> fotograma del video. La UI nueva de Flow ya no tiene esas ranuras, asi que la
+> CLI corta con un error claro en vez de generar cualquier cosa. Para guiar un
+> video con una imagen, usa `--refs`.
+
 `--refs` = **modo Ingredientes**: Flow usa esas imagenes como referencia visual
 del video. Es lo mas cercano a mantener un personaje entre escenas. Acepta
 archivos locales separados por coma, y dentro de un `batch` tambien el `name` de
 un job anterior (ahi reusa el asset que ya vive en el proyecto Flow, sin volver
 a subirlo).
 
-Modelos validos:
-- Imagen: `Nano Banana 2` (default), `Nano Banana Pro`, `Imagen 4`
-- Video: `Veo 3.1 - Lite` (default), `Veo 3.1 - Fast`, `Veo 3.1 - Quality`, `Omni Flash`
+Modelos validos (UI de Flow, septiembre 2026):
+- Imagen: `Nano Banana 2` (default), `Nano Banana Pro`, `Nano Banana 2 Lite`
+- Video: `Veo 3.1 - Lite` (default), `Veo 3.1 - Fast`, `Veo 3.1 - Quality`, `Omni 1.1 Flash`
 - Ratios: `9:16`, `16:9`, `1:1`, `4:3`, `3:4`
+- Resolucion: imagen `1K`/`2K`/`4K`, video `720p`/`1080p`/`4K`
+
+Si escribis mal un modelo, la CLI corta antes de abrir el navegador y te lista
+las opciones.
 
 ---
 
@@ -139,11 +148,10 @@ Reglas:
 - Cada `image` -> `outputs/<project>/<name>.png`. Cada `video` -> `outputs/<project>/<name>.mp4`.
 - Campos opcionales por job: `model`, `ratio`, `count`, `res`, `image` (referencia),
   `start`, `end`, `refs` (lista de ingredientes).
-- `start`/`end` = **fotogramas**: el video arranca (o termina) exactamente en esa imagen.
-  `refs` = **ingredientes**: Flow toma las imagenes como referencia de estilo/personaje,
-  sin clavarlas como primer fotograma. Para una escena dialogada con dos personajes,
-  `refs` suele dar mejor resultado que `start`.
-- Los dos son excluyentes: si un job trae `refs`, se ignoran `start`/`end`.
+- `refs` = **ingredientes**: Flow toma las imagenes como referencia de estilo/personaje.
+  Es la unica forma de guiar un video con imagenes en la UI actual.
+- `start`/`end` (fotogramas) ya no existen en Flow: un job que los use falla con
+  un mensaje que explica que uses `refs`.
 - Con `count: 3` el job produce `<name>_1`, `<name>_2`, `<name>_3` y el reporte los lista
   todos en `files`.
 - Ver `examples/guion_ejemplo.json` y `examples/guion_ingredientes.json`.
@@ -182,6 +190,8 @@ Flujo recomendado para un guion del usuario:
 | Login no se detecta | Vuelve a correr `login` y termina de iniciar sesion antes de 4 min. |
 | Video tarda | Es normal: Veo puede tardar varios minutos. El comando espera solo. |
 | Falla una escena del batch | El batch sigue con las demas; revisa `batch_report.json` y reintenta esa. |
+| "Target page, context or browser has been closed" al descargar | Bug conocido: Chrome se cierra en algunas descargas. Es intermitente; volve a correr ese job. |
+| "El modo Fotogramas no esta portado" | Usa `--refs` en lugar de `--start`/`--end`. |
 | "Referencia 'X': no es un archivo existente..." | En `refs` pusiste un nombre que no es ni un archivo ni un job anterior **del mismo batch**. Los nombres solo valen dentro de una corrida. |
 | "modelo de imagen 'X' no valido" | Escribiste mal el modelo. La CLI ahora falla antes de abrir el navegador y te lista las opciones. |
 

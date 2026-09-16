@@ -4,6 +4,7 @@ startup() abre Chrome con el perfil persistente; shutdown() lo cierra.
 Ambos se llaman una vez por comando de flow.py.
 """
 import asyncio
+import os
 import sys
 from pathlib import Path
 from playwright.async_api import async_playwright, BrowserContext, Page, Playwright
@@ -19,6 +20,7 @@ if sys.platform.startswith("linux"):
 _playwright: Playwright | None = None
 _context: BrowserContext | None = None
 _page: Page | None = None
+_guardia: Page | None = None
 _lock = asyncio.Lock()
 
 
@@ -76,6 +78,21 @@ async def _launch() -> None:
 
     _page = _context.pages[0] if _context.pages else await _context.new_page()
 
+    # Pestana de guardia. Flow dispara algunas descargas en una pestana nueva que
+    # Chrome cierra al terminar; si esa era la unica del contexto, se cierra el
+    # navegador entero y la descarga se pierde a medio guardar.
+    global _guardia
+    _guardia = await _context.new_page()
+    await _guardia.goto("about:blank")
+    await _page.bring_to_front()
+
+    if os.getenv("FLOW_DEBUG"):
+        import traceback
+        _page.on("close", lambda _: print("  [debug] se cerro la pagina"))
+        _context.on("close", lambda _: print("  [debug] se cerro el contexto"))
+        _page.on("crash", lambda _: print("  [debug] la pagina CRASHEO"))
+        _context.on("page", lambda pg: print(f"  [debug] pagina nueva: {pg.url[:80]}"))
+
 
 async def shutdown() -> None:
     """Cierra contexto y Playwright. Si el cierre del contexto falla igual se
@@ -91,7 +108,7 @@ async def shutdown() -> None:
             if _playwright:
                 await _playwright.stop()
         finally:
-            _playwright = _context = _page = None
+            _playwright = _context = _page = _guardia = None
 
 
 async def get_page() -> Page:
@@ -102,3 +119,23 @@ async def get_page() -> Page:
 
 def get_lock() -> asyncio.Lock:
     return _lock
+
+
+async def cerrar_overlays(page) -> None:
+    """Cierra menus y paneles flotantes de Angular Material.
+
+    Sin esto, el submenu que queda abierto tras una descarga tapa la barra de
+    instruccion y la operacion siguiente falla con un error enganoso.
+
+    Solo cuentan los paneles VISIBLES: Angular deja panes vacios en el DOM, y
+    tomarlos por menus abiertos disparaba Escapes y clicks a ciegas.
+    """
+    panes = page.locator(".cdk-overlay-pane:visible")
+    for _ in range(3):
+        try:
+            if await panes.count() == 0:
+                return
+        except Exception:
+            return
+        await page.keyboard.press("Escape")
+        await page.wait_for_timeout(400)

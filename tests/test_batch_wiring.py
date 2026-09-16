@@ -2,8 +2,8 @@
 Smoke test del cableado de la CLI, sin navegador.
 
 No prueba los selectores de Flow (eso solo se valida corriendo contra la UI
-real); prueba que batch/refs/ingredientes/report llamen a lo que tienen que
-llamar, en el orden correcto.
+real); prueba que batch/refs/registro/report llamen a lo que tienen que llamar,
+en el orden correcto.
 
     python -m unittest discover -s tests
 """
@@ -11,7 +11,6 @@ import asyncio
 import json
 import sys
 import tempfile
-import types
 import unittest
 from argparse import Namespace
 from pathlib import Path
@@ -25,11 +24,11 @@ from flow_provider import registry
 class FakeFlow:
     """Doble de flow_provider que anota cada llamada."""
 
-    def __init__(self, fail_on: set[str] | None = None, fail_create: bool = False):
+    def __init__(self, fail_create: bool = False):
         self.calls: list[tuple] = []
-        self.fail_on = fail_on or set()
         self.fail_create = fail_create
-        self._counter = 0
+        self.assets: list[dict] = []
+        self._n = 0
 
     def _log(self, name, *args, **kwargs):
         self.calls.append((name, args, kwargs))
@@ -44,7 +43,7 @@ class FakeFlow:
         self._log("create_project")
         if self.fail_create:
             raise RuntimeError("no se pudo crear el proyecto")
-        return ("uuid-proyecto", "http://flow/project/uuid-proyecto")
+        return ("uuid-proyecto", "https://flow.google.com/project/uuid-proyecto")
 
     async def select_image_mode(self, **kw):
         self._log("select_image_mode", **kw)
@@ -52,46 +51,41 @@ class FakeFlow:
     async def select_video_mode(self, **kw):
         self._log("select_video_mode", **kw)
 
-    async def upload_standalone_image(self, path):
-        self._log("upload_standalone_image", path)
+    async def upload_media(self, path):
+        self._log("upload_media", path)
+        uuid = f"uuid-subido-{len(self.assets)}"
+        self.assets.append({"id": uuid, "tipo": "image", "listo": True})
+        return uuid
 
-    async def select_ingredients_by_name(self, uuids):
-        self._log("select_ingredients_by_name", tuple(uuids))
+    async def add_asset_to_prompt(self, uuid):
+        self._log("add_asset_to_prompt", uuid)
 
-    async def upload_frame(self, path, slot="initial"):
-        self._log("upload_frame", path, slot=slot)
-
-    async def get_canvas_count(self):
-        return self._counter
+    async def snapshot_assets(self):
+        return list(self.assets)
 
     async def submit_prompt(self, prompt):
         self._log("submit_prompt", prompt)
-        if prompt in self.fail_on:
-            raise RuntimeError("Flow rechazo el prompt")
-        self._counter += 1
 
-    async def wait_for_image(self, pre_submit_count=None):
-        self._log("wait_for_image", pre_submit_count)
+    async def wait_for_new_assets(self, previos, esperados=1, is_video=False, timeout_ms=0):
+        self._log("wait_for_new_assets", esperados, is_video=is_video)
+        self._n += 1
+        nuevos = [
+            {"id": f"uuid-gen{self._n}-{i}", "tipo": "video" if is_video else "image", "listo": True}
+            for i in range(esperados)
+        ]
+        self.assets.extend(nuevos)
+        return nuevos
 
-    async def wait_for_video(self, pre_submit_count=None):
-        self._log("wait_for_video", pre_submit_count)
-
-    async def download_many(self, out_path, count=1, resolution="1K", is_video=False):
-        self._log("download_many", out_path, count=count, resolution=resolution, is_video=is_video)
+    async def download_assets(self, uuids, out_path, resolution="1K"):
+        self._log("download_assets", tuple(uuids), out_path, resolution=resolution)
         base = Path(out_path)
-        if count <= 1:
+        if len(uuids) == 1:
             files = [out_path]
         else:
-            files = [str(base.with_name(f"{base.stem}_{i + 1}{base.suffix}")) for i in range(count)]
+            files = [str(base.with_name(f"{base.stem}_{i + 1}{base.suffix}")) for i in range(len(uuids))]
         for f in files:
             Path(f).write_bytes(b"fake")
         return files
-
-    async def capture_newest_asset_name(self, label, is_video=False):
-        uuid = f"uuid-{label}"
-        registry.capture_name(label, uuid)
-        self._log("capture_newest_asset_name", label, is_video=is_video)
-        return uuid
 
     def names(self):
         return [c[0] for c in self.calls]
@@ -120,34 +114,28 @@ class BatchWiringTest(unittest.TestCase):
         args = Namespace(jobfile=str(jobfile), out=str(self.out))
         return asyncio.run(cli.cmd_batch(args))
 
-    def test_encadenado_y_ingredientes(self):
+    def test_ingredientes_reusan_el_asset_del_proyecto(self):
         code = self._run_batch({
             "project": "demo",
             "jobs": [
                 {"type": "image", "name": "personaje", "prompt": "una fresa"},
-                {"type": "video", "name": "escena1", "start": "personaje", "prompt": "camina"},
-                {"type": "video", "name": "escena2", "refs": ["personaje"], "prompt": "baila"},
+                {"type": "video", "name": "escena1", "refs": ["personaje"], "prompt": "baila"},
             ],
         })
         self.assertEqual(code, 0)
 
-        # 1) el video encadenado usa el PNG del job anterior como fotograma
-        frames = self.fake.find("upload_frame")
-        self.assertEqual(len(frames), 1)
-        self.assertTrue(frames[0][1][0].endswith("personaje.png"), frames[0])
-
-        # 2) el video con refs entra en modo ingredientes y reusa el UUID
+        # el video entra en modo ingredientes
         modos = [c[2]["mode"] for c in self.fake.find("select_video_mode")]
-        self.assertEqual(modos, ["fotogramas", "ingredientes"])
-        ingr = self.fake.find("select_ingredients_by_name")
-        self.assertEqual(ingr[0][1][0], ("uuid-personaje",))
+        self.assertEqual(modos, ["ingredientes"])
 
-        # 3) no se vuelve a subir el archivo si el asset ya vive en el proyecto
-        self.assertEqual(self.fake.find("upload_standalone_image"), [])
+        # y reusa el UUID que registro el job de imagen, sin volver a subir nada
+        adjuntos = self.fake.find("add_asset_to_prompt")
+        self.assertEqual(len(adjuntos), 1)
+        self.assertEqual(adjuntos[0][1][0], "uuid-gen1-0")
+        self.assertEqual(self.fake.find("upload_media"), [])
 
-        # 4) el reporte quedo escrito
         report = json.loads((self.out / "demo" / "batch_report.json").read_text(encoding="utf-8"))
-        self.assertEqual([r["name"] for r in report], ["personaje", "escena1", "escena2"])
+        self.assertEqual([r["name"] for r in report], ["personaje", "escena1"])
         self.assertTrue(all(r["ok"] for r in report))
 
     def test_ref_como_archivo_local(self):
@@ -158,7 +146,7 @@ class BatchWiringTest(unittest.TestCase):
             "jobs": [{"type": "image", "name": "a", "refs": [str(ref)], "prompt": "p"}],
         })
         self.assertEqual(code, 0)
-        subidas = self.fake.find("upload_standalone_image")
+        subidas = self.fake.find("upload_media")
         self.assertEqual(len(subidas), 1)
         self.assertEqual(subidas[0][1][0], str(ref))
 
@@ -176,12 +164,28 @@ class BatchWiringTest(unittest.TestCase):
         self.assertIn("no_existe", report[0]["error"])
         self.assertTrue(report[1]["ok"])
 
+    def test_fotogramas_falla_con_mensaje_claro(self):
+        code = self._run_batch({
+            "project": "demo",
+            "jobs": [
+                {"type": "image", "name": "a", "prompt": "p"},
+                {"type": "video", "name": "b", "start": "a", "prompt": "p"},
+            ],
+        })
+        self.assertEqual(code, 1)
+        report = json.loads((self.out / "demo" / "batch_report.json").read_text(encoding="utf-8"))
+        self.assertTrue(report[0]["ok"])
+        self.assertIn("Fotogramas", report[1]["error"])
+        self.assertIn("--refs", report[1]["error"])
+
     def test_varias_variantes_se_bajan_todas(self):
         code = self._run_batch({
             "project": "demo",
             "jobs": [{"type": "image", "name": "a", "count": 3, "prompt": "p"}],
         })
         self.assertEqual(code, 0)
+        pedidos = self.fake.find("download_assets")
+        self.assertEqual(len(pedidos[0][1][0]), 3)
         report = json.loads((self.out / "demo" / "batch_report.json").read_text(encoding="utf-8"))
         self.assertEqual(len(report[0]["files"]), 3)
 
@@ -192,7 +196,6 @@ class BatchWiringTest(unittest.TestCase):
         report = json.loads((self.out / "demo" / "batch_report.json").read_text(encoding="utf-8"))
         self.assertEqual(report[0]["name"], "__batch__")
         self.assertIn("no se pudo crear", report[0]["error"])
-        # el navegador se cierra igual
         self.assertIn("shutdown", self.fake.names())
 
 

@@ -78,7 +78,40 @@ Los comandos sueltos caen en `outputs/`; cada `batch` se agrupa en `outputs/<pro
 
 Fork de [BRPLia/google-flow-skill-v1](https://github.com/BRPLia/google-flow-skill-v1).
 
-Arreglos:
+### Port a la UI nueva de Flow (2026-09-16)
+
+Google reescribio Flow: se mudo a `flow.google.com` y cambio de React/Radix a
+Angular Material. **Ningun selector del original funciona ya.** Este fork esta
+portado y verificado contra la UI actual:
+
+| Que | Estado |
+|---|---|
+| `image` (texto -> imagen) | Verificado de punta a punta |
+| `batch` con varios jobs | Verificado |
+| `video` con `--refs` (ingredientes) | Genera y descarga; falta mas rodaje |
+| `--start` / `--end` (fotogramas) | **No portado**: la UI ya no tiene esas ranuras |
+| Descarga | Funciona, pero Chrome se cierra en algunas corridas (ver abajo) |
+
+Bug abierto: en algunas descargas Chrome se cierra solo y el job falla con
+`Target page, context or browser has been closed`. Es intermitente (4 de 7
+descargas salieron bien en las pruebas). El batch anota el fallo y sigue; basta
+reintentar ese job.
+
+Mapa de la UI nueva, por si hay que reparar selectores:
+
+```
+flow-base-prompt-box button[aria-label*="onfiguraci"]   modelo, ratio, cantidad
+  [role=radio] "image" / "videocam"                     modo
+  [role=radio] "crop_9_16" ...                          ratio (nombres de icono)
+  [role=radio] "x1".."x4"                               cantidad
+button[aria-label*="niciar generaci"]                   enviar
+button[aria-label*="ingredientes al cuadro"]            referencias y carga
+flow-tile-container                                     cada resultado
+  img.image (imagen) / img.thumbnail (video)
+  button[aria-label*="opciones"] -> Descargar -> resolucion
+```
+
+### Arreglos de logica (valen igual en cualquier UI)
 - `--image` / `--refs` ahora **si** adjuntan la referencia al prompt (antes la imagen
   quedaba suelta en el canvas y la generacion la ignoraba).
 - El reintento ante "No se pudo generar" vuelve a funcionar dentro de un `batch`

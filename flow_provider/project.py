@@ -1,71 +1,75 @@
 """
-Creación y navegación de proyectos en Google Flow.
+Creacion y navegacion de proyectos en Google Flow.
+
+Flow se mudo de labs.google/fx/.../tools/flow a flow.google.com (2026).
+El dominio viejo redirige, pero apuntar directo evita un salto y un timeout.
 """
 from .browser import get_page
 
-FLOW_BASE_URL = "https://labs.google/fx/es-419/tools/flow"
+FLOW_BASE_URL = "https://flow.google.com"
 
+# flow-base-prompt-box es el custom element de la barra de instruccion: si esta
+# en el DOM, el proyecto termino de renderizar.
+SEL_LISTO = "flow-base-prompt-box"
+SEL_NUEVO_PROYECTO = (
+    'button:has-text("Proyecto nuevo"), '
+    'button:has-text("New project"), '
+    'button[aria-label*="royecto nuevo"]'
+)
 
-import re
 
 async def _dismiss_fullscreen_viewer(page) -> None:
-    """Presiona Escape para cerrar cualquier visor/lightbox que se haya abierto accidentalmente."""
+    """Escape para cerrar cualquier visor que se haya abierto sin querer."""
     try:
         await page.keyboard.press("Escape")
-        await page.wait_for_timeout(1000)
+        await page.wait_for_timeout(800)
     except Exception:
         pass
 
 
 async def ensure_all_media_tab(page) -> None:
-    """Asegura que el panel lateral izquierdo esté en 'Todo el contenido multimedia'.
-    
-    Debe llamarse antes de cualquier operación que necesite encontrar
-    imágenes o videos en el canvas principal del proyecto.
+    """Deja el panel izquierdo en 'Todos los elementos'.
+
+    En la UI nueva son mat-list-item, no botones con icono dashboard.
     """
     try:
-        # El botón tiene un ícono google-symbols "dashboard" y el texto accesible oculto
-        all_media_btn = page.locator('button:has(i:text-is("dashboard"))')
-        
-        if await all_media_btn.count() > 0 and await all_media_btn.first.is_visible():
-            await all_media_btn.first.click()
-            await page.wait_for_timeout(1500)
+        tab = page.locator('mat-list-item:has-text("dashboard")')
+        if await tab.count() == 0:
+            tab = page.locator('mat-list-item:has-text("Todos")')
+        if await tab.count() and await tab.first.is_visible():
+            await tab.first.click()
+            await page.wait_for_timeout(1200)
     except Exception:
         pass
 
 
 async def create_project() -> tuple[str, str]:
-    """Crea un proyecto nuevo en Flow. Retorna (project_uuid, project_url).
-    Debe llamarse mientras se sostiene get_lock().
-    """
+    """Crea un proyecto nuevo. Retorna (project_uuid, project_url)."""
     page = await get_page()
     await page.goto(FLOW_BASE_URL, wait_until="domcontentloaded")
-    await page.wait_for_load_state("domcontentloaded")
-    await page.wait_for_timeout(3000)
+    await page.wait_for_timeout(4000)
 
-    # Cerrar modal de novedades si aparece
-    try:
-        modal_btn = page.locator('button[aria-current="true"]')
-        if await modal_btn.count() > 0:
-            await modal_btn.first.click()
-            await page.wait_for_timeout(1000)
-    except Exception:
-        pass
+    # Cerrar banner/modal de novedades si aparece.
+    for sel in ['button[aria-label*="escartar banner"]', 'button[aria-current="true"]']:
+        try:
+            b = page.locator(sel)
+            if await b.count() and await b.first.is_visible():
+                await b.first.click()
+                await page.wait_for_timeout(800)
+        except Exception:
+            pass
 
-    # Click en Proyecto nuevo (esperar a que el SPA lo pinte)
-    new_btn = page.locator('button:has-text("Proyecto nuevo")')
-    await new_btn.first.wait_for(state="visible", timeout=15000)
-    await new_btn.first.click()
+    btn = page.locator(SEL_NUEVO_PROYECTO)
+    await btn.first.wait_for(state="visible", timeout=20000)
+    await btn.first.click()
 
-    # Esperar URL de proyecto
-    await page.wait_for_url("**/project/**", timeout=15000)
+    await page.wait_for_url("**/project/**", timeout=20000)
     project_url = page.url
-    project_uuid = project_url.rstrip("/").split("/")[-1]
+    project_uuid = project_url.rstrip("/").split("/")[-1].split("?")[0]
 
-    # Esperar SPA render — CRÍTICO sin esto pantalla negra
-    await page.wait_for_load_state("domcontentloaded")
-    await page.wait_for_timeout(5000)
-    await page.wait_for_selector('button:has-text("Crear"), button:has-text("Banana"), button:has-text("Veo")', timeout=15000)
+    # Sin esta espera el SPA todavia no pinto la barra de instruccion.
+    await page.wait_for_selector(SEL_LISTO, timeout=25000)
+    await page.wait_for_timeout(2500)
 
     await _dismiss_fullscreen_viewer(page)
     await ensure_all_media_tab(page)
@@ -73,17 +77,13 @@ async def create_project() -> tuple[str, str]:
 
 
 async def navigate_to_project(project_uuid: str) -> None:
-    """Navega a un proyecto existente. Debe llamarse con lock."""
+    """Navega a un proyecto existente."""
     page = await get_page()
-    target_url = f"{FLOW_BASE_URL}/project/{project_uuid}"
-    if page.url != target_url:
-        await page.goto(target_url, wait_until="domcontentloaded")
-        await page.wait_for_load_state("domcontentloaded")
-        await page.wait_for_timeout(5000)
-        await page.wait_for_selector('button:has-text("Crear"), button:has-text("Banana"), button:has-text("Veo")', timeout=15000)
+    target = f"{FLOW_BASE_URL}/project/{project_uuid}"
+    if not page.url.startswith(target):
+        await page.goto(target, wait_until="domcontentloaded")
+        await page.wait_for_selector(SEL_LISTO, timeout=25000)
+        await page.wait_for_timeout(3000)
 
-    # Siempre al entrar al proyecto: cerrar visores accidentales y asegurar pestaña correcta
     await _dismiss_fullscreen_viewer(page)
     await ensure_all_media_tab(page)
-
-
