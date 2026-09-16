@@ -172,6 +172,109 @@ async def cmd_status(_args) -> int:
 # ---------------------------------------------------------------------------
 # Generadores atomicos (asumen proyecto YA abierto)
 # ---------------------------------------------------------------------------
+# Proyecto Flow de la corrida actual. Se necesita para volver a entrar si hay
+# que relanzar el navegador a mitad de camino.
+_PROYECTO = {"uuid": None}
+
+# El src de un asset lleva un token que vence: al recargar el proyecto cambia.
+# Se guarda ademas su posicion en el canvas para poder reubicarlo.
+_POSICIONES: dict[str, int] = {}
+
+
+async def _abrir_proyecto() -> None:
+    uuid, _url = await flow.create_project()
+    _PROYECTO["uuid"] = uuid
+
+
+async def _relanzar_navegador() -> None:
+    """Cierra y vuelve a abrir el navegador sobre el mismo proyecto."""
+    try:
+        await flow.shutdown()
+    except Exception:
+        pass
+    await flow.startup()
+    if _PROYECTO["uuid"]:
+        await flow.navigate_to_project(_PROYECTO["uuid"])
+
+
+async def _asegurar_navegador() -> None:
+    """Si el navegador se cayo en el job anterior, lo levanta de nuevo.
+
+    Sin esto, una caida en el primer job arrastraba a todos los demas del batch.
+    """
+    if not flow.navegador_vivo():
+        print("  el navegador no esta en pie; lo reabro")
+        await _relanzar_navegador()
+
+
+def _es_navegador_caido(e: Exception) -> bool:
+    texto = str(e).lower()
+    return "closed" in texto or "crash" in texto or "disconnected" in texto
+
+
+async def _descargar(nuevos, out_path, resolution):
+    """Descarga los assets recien generados, sobreviviendo a una caida de Chrome.
+
+    Al recargar el proyecto los src cambian (llevan un token con vencimiento),
+    asi que para reintentar se guarda tambien la posicion de cada asset.
+    """
+    todos = await flow.snapshot_assets()
+    posicion = {a["id"]: i for i, a in enumerate(todos)}
+    indices = [posicion.get(a["id"]) for a in nuevos]
+
+    ids = [a["id"] for a in nuevos]
+    ultimo: Exception | None = None
+    for intento in range(3):
+        try:
+            return await flow.download_assets(ids, out_path, resolution=resolution)
+        except Exception as e:
+            if not _es_navegador_caido(e):
+                raise
+            ultimo = e
+            print(f"  el navegador se cayo durante la descarga "
+                  f"(intento {intento + 1}/3); reabro y reintento")
+            await _relanzar_navegador()
+            todos = await flow.snapshot_assets()
+            ids = [todos[i]["id"] for i in indices if i is not None and i < len(todos)]
+            if not ids:
+                raise RuntimeError(
+                    "El navegador se cayo durante la descarga y al reabrir no se "
+                    "pudo reubicar el resultado en el proyecto."
+                ) from e
+    raise RuntimeError(
+        "El navegador se cayo en las tres descargas. El resultado quedo generado "
+        "en el proyecto de Flow; se puede bajar a mano."
+    ) from ultimo
+
+
+async def _registrar(label: str, asset: dict) -> None:
+    """Guarda un asset bajo 'label', con su src y su posicion en el canvas."""
+    registry.capture_name(label, asset["id"])
+    todos = await flow.snapshot_assets()
+    for i, a in enumerate(todos):
+        if a["id"] == asset["id"]:
+            _POSICIONES[label] = i
+            break
+
+
+async def _resolver_asset(label: str) -> str | None:
+    """Devuelve el src actual del asset guardado como 'label'.
+
+    Si el proyecto se recargo, el src viejo ya no existe y se reubica por
+    posicion.
+    """
+    guardado = registry.get_all().get(label)
+    actuales = await flow.snapshot_assets()
+    if guardado and any(a["id"] == guardado for a in actuales):
+        return guardado
+    idx = _POSICIONES.get(label)
+    if idx is not None and idx < len(actuales):
+        vigente = actuales[idx]["id"]
+        registry.capture_name(label, vigente)
+        return vigente
+    return None
+
+
 async def _attach_refs(refs: list[str]) -> list[str]:
     """Adjunta referencias al prompt, en orden. Devuelve sus UUIDs.
 
@@ -187,8 +290,14 @@ async def _attach_refs(refs: list[str]) -> list[str]:
         # mas consistente que volver a subir el archivo.
         label = ref if ref in known else Path(ref).stem
         if label in known:
-            await flow.add_asset_to_prompt(known[label])
-            uuids.append(known[label])
+            vigente = await _resolver_asset(label)
+            if vigente is None:
+                raise ValueError(
+                    f"La referencia '{ref}' se genero en este batch pero ya no se "
+                    "encuentra en el proyecto de Flow."
+                )
+            await flow.add_asset_to_prompt(vigente)
+            uuids.append(vigente)
             continue
         path = Path(ref)
         if path.exists():
@@ -220,9 +329,8 @@ async def _gen_image(prompt, ratio, model, count, refs, out_path,
     nuevos = await flow.wait_for_new_assets(previos, esperados=count,
                                             is_video=False, timeout_ms=240_000)
     if label and nuevos:
-        registry.capture_name(label, nuevos[0]["id"])
-    return await flow.download_assets([a["id"] for a in nuevos], out_path,
-                                      resolution=resolution)
+        await _registrar(label, nuevos[0])
+    return await _descargar(nuevos, out_path, resolution)
 
 
 async def _gen_video(prompt, ratio, model, count, start, end, refs, out_path,
@@ -238,9 +346,8 @@ async def _gen_video(prompt, ratio, model, count, start, end, refs, out_path,
     nuevos = await flow.wait_for_new_assets(previos, esperados=count,
                                             is_video=True, timeout_ms=600_000)
     if label and nuevos:
-        registry.capture_name(label, nuevos[0]["id"])
-    return await flow.download_assets([a["id"] for a in nuevos], out_path,
-                                      resolution=resolution)
+        await _registrar(label, nuevos[0])
+    return await _descargar(nuevos, out_path, resolution)
 
 
 def _split_refs(value):
@@ -258,7 +365,7 @@ async def cmd_image(args) -> int:
     refs = _split_refs(args.refs) or ([args.image] if args.image else [])
     await flow.startup()
     try:
-        await flow.create_project()
+        await _abrir_proyecto()
         saved = await _gen_image(args.prompt, args.ratio, args.model, args.count, refs,
                                  out_path, resolution=args.res, label=name)
         for f in saved:
@@ -278,7 +385,7 @@ async def cmd_video(args) -> int:
     refs = _split_refs(args.refs)
     await flow.startup()
     try:
-        await flow.create_project()
+        await _abrir_proyecto()
         saved = await _gen_video(args.prompt, args.ratio, args.model, args.count,
                                  args.start, args.end, refs, out_path,
                                  resolution=args.res, label=name)
@@ -313,10 +420,11 @@ async def cmd_batch(args) -> int:
     # Los UUIDs registrados pertenecen a UN proyecto Flow. Cada batch abre uno
     # nuevo, asi que arrancar con el registry limpio.
     registry.clear()
+    _POSICIONES.clear()
 
     await flow.startup()
     try:
-        await flow.create_project()
+        await _abrir_proyecto()
         for i, job in enumerate(jobs, 1):
             jtype = job.get("type", "image")
             name = job.get("name") or f"{jtype}_{i:02d}"
@@ -328,6 +436,7 @@ async def cmd_batch(args) -> int:
                 refs = _split_refs(refs)
             print(f"\n--- [{i}/{len(jobs)}] {jtype} :: {name} ---")
             try:
+                await _asegurar_navegador()
                 if jtype == "image":
                     if not refs and job.get("image"):
                         refs = [_resolve_asset(project_dir, job["image"])]

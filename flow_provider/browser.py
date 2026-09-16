@@ -13,9 +13,49 @@ from . import settings
 
 # --no-sandbox solo hace falta en contenedores Linux corriendo como root; en
 # Windows/macOS baja el sandbox de Chrome sin ganar nada.
-_CHROME_ARGS = ["--disable-blink-features=AutomationControlled"]
+_CHROME_ARGS = [
+    "--disable-blink-features=AutomationControlled",
+    # Playwright fuerza render por software y el proceso GPU se cae al descargar
+    # (el perfil quedaba con exit_type "Crashed"). Sin GPU no hay a quien matar.
+    "--disable-gpu",
+    "--disable-software-rasterizer",
+    "--safebrowsing-disable-download-protection",
+]
 if sys.platform.startswith("linux"):
     _CHROME_ARGS.append("--no-sandbox")
+
+
+def _sanear_perfil() -> None:
+    """Deja el perfil listo para un arranque limpio.
+
+    Si Chrome se cayo, el perfil queda marcado como "Crashed" y al reabrir
+    aparece el globo de restaurar pestanas, que se come clicks. De paso se fija
+    que las descargas no pregunten donde guardar.
+    """
+    import json
+
+    prefs = Path(settings.FLOW_CHROME_PROFILE) / "Default" / "Preferences"
+    if not prefs.exists():
+        return
+    try:
+        datos = json.loads(prefs.read_text(encoding="utf-8"))
+    except Exception:
+        return
+    perfil = datos.setdefault("profile", {})
+    perfil["exit_type"] = "Normal"
+    perfil["exited_cleanly"] = True
+    descargas = datos.setdefault("download", {})
+    descargas["prompt_for_download"] = False
+    descargas["directory_upgrade"] = True
+    # La verificacion de descargas de Safe Browsing es la sospechosa de tumbar
+    # el proceso al bajar archivos de flow-content.google.
+    seguridad = datos.setdefault("safebrowsing", {})
+    seguridad["enabled"] = False
+    seguridad["disable_download_protection"] = True
+    try:
+        prefs.write_text(json.dumps(datos), encoding="utf-8")
+    except Exception:
+        pass
 
 _playwright: Playwright | None = None
 _context: BrowserContext | None = None
@@ -67,6 +107,7 @@ async def _launch() -> None:
                             # Ignorar si no se puede borrar porque está en uso real
                             pass
                             
+        _sanear_perfil()
         _context = await _playwright.chromium.launch_persistent_context(
             user_data_dir=settings.FLOW_CHROME_PROFILE or "/tmp/flow-profile",
             headless=settings.FLOW_HEADLESS,
@@ -139,3 +180,13 @@ async def cerrar_overlays(page) -> None:
             return
         await page.keyboard.press("Escape")
         await page.wait_for_timeout(400)
+
+
+def navegador_vivo() -> bool:
+    """True si la pagina sigue utilizable."""
+    if _page is None:
+        return False
+    try:
+        return not _page.is_closed()
+    except Exception:
+        return False

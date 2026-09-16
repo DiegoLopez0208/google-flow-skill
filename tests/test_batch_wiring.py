@@ -24,20 +24,31 @@ from flow_provider import registry
 class FakeFlow:
     """Doble de flow_provider que anota cada llamada."""
 
-    def __init__(self, fail_create: bool = False):
+    def __init__(self, fail_create: bool = False, caidas_en_descarga: int = 0):
         self.calls: list[tuple] = []
         self.fail_create = fail_create
+        self.caidas_en_descarga = caidas_en_descarga
         self.assets: list[dict] = []
         self._n = 0
+        self._vivo = True
 
     def _log(self, name, *args, **kwargs):
         self.calls.append((name, args, kwargs))
 
+    def navegador_vivo(self):
+        return self._vivo
+
     async def startup(self):
         self._log("startup")
+        self._vivo = True
 
     async def shutdown(self):
         self._log("shutdown")
+
+    async def navigate_to_project(self, uuid):
+        self._log("navigate_to_project", uuid)
+        # Al recargar, Flow renueva el token del src de cada asset.
+        self.assets = [{**a, "id": a["id"] + "-renovado"} for a in self.assets]
 
     async def create_project(self):
         self._log("create_project")
@@ -78,6 +89,10 @@ class FakeFlow:
 
     async def download_assets(self, uuids, out_path, resolution="1K"):
         self._log("download_assets", tuple(uuids), out_path, resolution=resolution)
+        if self.caidas_en_descarga > 0:
+            self.caidas_en_descarga -= 1
+            self._vivo = False
+            raise Exception("Download.path: Target page, context or browser has been closed")
         base = Path(out_path)
         if len(uuids) == 1:
             files = [out_path]
@@ -188,6 +203,35 @@ class BatchWiringTest(unittest.TestCase):
         self.assertEqual(len(pedidos[0][1][0]), 3)
         report = json.loads((self.out / "demo" / "batch_report.json").read_text(encoding="utf-8"))
         self.assertEqual(len(report[0]["files"]), 3)
+
+    def test_se_recupera_si_el_navegador_se_cae_descargando(self):
+        self.fake.caidas_en_descarga = 1
+        code = self._run_batch({
+            "project": "demo",
+            "jobs": [{"type": "image", "name": "a", "prompt": "p"}],
+        })
+        self.assertEqual(code, 0)
+        # relanzo el navegador y volvio al mismo proyecto
+        self.assertIn("navigate_to_project", self.fake.names())
+        # y reubico el asset pese a que el src cambio al recargar
+        pedidos = self.fake.find("download_assets")
+        self.assertEqual(len(pedidos), 2)
+        self.assertTrue(pedidos[1][1][0][0].endswith("-renovado"), pedidos[1])
+
+    def test_ref_se_reubica_tras_recargar_el_proyecto(self):
+        self.fake.caidas_en_descarga = 1
+        code = self._run_batch({
+            "project": "demo",
+            "jobs": [
+                {"type": "image", "name": "personaje", "prompt": "p"},
+                {"type": "video", "name": "escena", "refs": ["personaje"], "prompt": "p"},
+            ],
+        })
+        self.assertEqual(code, 0)
+        # el ref apunta al src renovado, no al que quedo viejo tras la recarga
+        adjuntos = self.fake.find("add_asset_to_prompt")
+        self.assertEqual(len(adjuntos), 1)
+        self.assertTrue(adjuntos[0][1][0].endswith("-renovado"), adjuntos[0])
 
     def test_fallo_al_crear_proyecto_igual_escribe_reporte(self):
         self.fake.fail_create = True

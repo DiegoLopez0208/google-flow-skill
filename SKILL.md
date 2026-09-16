@@ -190,7 +190,7 @@ Flujo recomendado para un guion del usuario:
 | Login no se detecta | Vuelve a correr `login` y termina de iniciar sesion antes de 4 min. |
 | Video tarda | Es normal: Veo puede tardar varios minutos. El comando espera solo. |
 | Falla una escena del batch | El batch sigue con las demas; revisa `batch_report.json` y reintenta esa. |
-| "Target page, context or browser has been closed" al descargar | Bug conocido: Chrome se cierra en algunas descargas. Es intermitente; volve a correr ese job. |
+| "Target page, context or browser has been closed" al descargar | Chrome se cae en algunas descargas. La CLI reabre el navegador y reintenta sola hasta 3 veces; si aun asi falla, el resultado quedo generado en Flow y se puede bajar a mano. |
 | "El modo Fotogramas no esta portado" | Usa `--refs` en lugar de `--start`/`--end`. |
 | "Referencia 'X': no es un archivo existente..." | En `refs` pusiste un nombre que no es ni un archivo ni un job anterior **del mismo batch**. Los nombres solo valen dentro de una corrida. |
 | "modelo de imagen 'X' no valido" | Escribiste mal el modelo. La CLI ahora falla antes de abrir el navegador y te lista las opciones. |

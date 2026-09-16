@@ -88,14 +88,24 @@ portado y verificado contra la UI actual:
 |---|---|
 | `image` (texto -> imagen) | Verificado de punta a punta |
 | `batch` con varios jobs | Verificado |
-| `video` con `--refs` (ingredientes) | Genera y descarga; falta mas rodaje |
+| `video` con `--refs` (ingredientes) | Verificado: imagen -> video que la referencia |
 | `--start` / `--end` (fotogramas) | **No portado**: la UI ya no tiene esas ranuras |
-| Descarga | Funciona, pero Chrome se cierra en algunas corridas (ver abajo) |
+| Descarga | Funciona, con recuperacion automatica (ver abajo) |
 
-Bug abierto: en algunas descargas Chrome se cierra solo y el job falla con
-`Target page, context or browser has been closed`. Es intermitente (4 de 7
-descargas salieron bien en las pruebas). El batch anota el fallo y sigue; basta
-reintentar ese job.
+**Chrome se cae en algunas descargas.** Es un crash del propio navegador, no de
+Playwright: el perfil queda marcado como `Crashed`. Se mitigo desactivando la
+GPU y la verificacion de descargas de Safe Browsing, y saneando el perfil en
+cada arranque; aun asi vuelve a pasar de vez en cuando.
+
+Para que no cueste una corrida entera, la CLI se recupera sola:
+- reintenta la descarga hasta 3 veces, relanzando el navegador y volviendo al
+  mismo proyecto de Flow;
+- al recargar, el `src` de cada asset cambia (lleva un token con vencimiento),
+  asi que los resultados se reubican por posicion en el canvas;
+- dentro de un `batch`, cada job verifica que el navegador este en pie antes de
+  empezar, de modo que una caida no arrastra a los que siguen.
+
+Lo generado nunca se pierde: queda en el proyecto de Flow aunque falle la bajada.
 
 Mapa de la UI nueva, por si hay que reparar selectores:
 
