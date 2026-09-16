@@ -19,6 +19,7 @@ from .configure import (
     select_video_mode,
 )
 from .canvas import (
+    click_add_to_prompt,
     select_ingredients_by_name,
     select_frame_from_project,
     upload_frame,
@@ -28,16 +29,16 @@ from .canvas import (
 )
 from .prompt import submit_prompt
 from .wait import wait_for_image, wait_for_video
-from .download import download_latest
+from .download import download_latest, download_many, delete_latest_card
 
 __all__ = [
     "startup", "shutdown", "get_page", "get_lock",
     "create_project", "navigate_to_project",
-    "select_ingredients_by_name", "select_frame_from_project",
+    "select_ingredients_by_name", "select_frame_from_project", "click_add_to_prompt",
     "upload_frame", "get_canvas_count", "capture_newest_asset_name",
     "submit_prompt",
     "wait_for_image", "wait_for_video",
-    "download_latest",
+    "download_latest", "download_many", "delete_latest_card",
     "generate_video_from_text",
     "generate_video_from_frame",
     "generate_video_from_frames",

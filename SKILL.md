@@ -66,9 +66,18 @@ corre `python setup.py` y reintenta.
 | Un video desde texto | `python flow.py video --prompt "..." --name escena1` |
 | Animar una imagen (img -> video) | `python flow.py video --prompt "..." --start frame.png --name x` |
 | Interpolar inicio -> fin | `python flow.py video --prompt "..." --start a.png --end b.png` |
+| Video guiado por personajes/referencias | `python flow.py video --prompt "..." --refs fresa.png,banano.png` |
 | Varios trabajos en orden | `python flow.py batch guion.json` |
 
-Opciones comunes: `--ratio 9:16` (default), `--model`, `--out carpeta`, `--name`.
+Opciones comunes: `--ratio 9:16` (default), `--model`, `--out carpeta`, `--name`,
+`--count 1..4` (variantes: se bajan TODAS como `<name>_1.png`, `<name>_2.png`...),
+`--res` (`1K`/`2K`/`4K` para imagen, `720p`/`1080p` para video).
+
+`--refs` = **modo Ingredientes**: Flow usa esas imagenes como referencia visual
+del video. Es lo mas cercano a mantener un personaje entre escenas. Acepta
+archivos locales separados por coma, y dentro de un `batch` tambien el `name` de
+un job anterior (ahi reusa el asset que ya vive en el proyecto Flow, sin volver
+a subirlo).
 
 Modelos validos:
 - Imagen: `Nano Banana 2` (default), `Nano Banana Pro`, `Imagen 4`
@@ -114,8 +123,9 @@ y usa `batch`. Eso mantiene orden y deja un `batch_report.json` con lo generado.
   "defaults": { "ratio": "9:16", "image_model": "Nano Banana 2", "video_model": "Veo 3.1 - Lite" },
   "jobs": [
     { "type": "image", "name": "escena1_frame", "prompt": "..." },
-    { "type": "video", "name": "escena1_video", "start": "outputs/escena1_frame.png", "prompt": "..." },
-    { "type": "video", "name": "escena2_video", "prompt": "..." }
+    { "type": "video", "name": "escena1_video", "start": "escena1_frame", "prompt": "..." },
+    { "type": "video", "name": "escena2_video", "refs": ["escena1_frame"], "prompt": "..." },
+    { "type": "video", "name": "escena3_video", "prompt": "..." }
   ]
 }
 ```
@@ -127,8 +137,16 @@ Reglas:
   `video` con `start: "escena1_frame"`. Basta el **nombre** del job anterior; la CLI lo resuelve
   dentro de la carpeta del proyecto (no necesitas escribir la ruta completa).
 - Cada `image` -> `outputs/<project>/<name>.png`. Cada `video` -> `outputs/<project>/<name>.mp4`.
-- Campos opcionales por job: `model`, `ratio`, `count`, `image` (referencia), `start`, `end`.
-- Ver `examples/guion_ejemplo.json`.
+- Campos opcionales por job: `model`, `ratio`, `count`, `res`, `image` (referencia),
+  `start`, `end`, `refs` (lista de ingredientes).
+- `start`/`end` = **fotogramas**: el video arranca (o termina) exactamente en esa imagen.
+  `refs` = **ingredientes**: Flow toma las imagenes como referencia de estilo/personaje,
+  sin clavarlas como primer fotograma. Para una escena dialogada con dos personajes,
+  `refs` suele dar mejor resultado que `start`.
+- Los dos son excluyentes: si un job trae `refs`, se ignoran `start`/`end`.
+- Con `count: 3` el job produce `<name>_1`, `<name>_2`, `<name>_3` y el reporte los lista
+  todos en `files`.
+- Ver `examples/guion_ejemplo.json` y `examples/guion_ingredientes.json`.
 
 Flujo recomendado para un guion del usuario:
 1. Lees el guion del usuario.
@@ -164,13 +182,21 @@ Flujo recomendado para un guion del usuario:
 | Login no se detecta | Vuelve a correr `login` y termina de iniciar sesion antes de 4 min. |
 | Video tarda | Es normal: Veo puede tardar varios minutos. El comando espera solo. |
 | Falla una escena del batch | El batch sigue con las demas; revisa `batch_report.json` y reintenta esa. |
+| "Referencia 'X': no es un archivo existente..." | En `refs` pusiste un nombre que no es ni un archivo ni un job anterior **del mismo batch**. Los nombres solo valen dentro de una corrida. |
+| "modelo de imagen 'X' no valido" | Escribiste mal el modelo. La CLI ahora falla antes de abrir el navegador y te lista las opciones. |
 
 ---
 
 ## 7. Limites (sé honesto con el usuario)
 
 Esta skill hace lo esencial de Flow: texto->imagen, texto->video, imagen->video,
-edicion con referencia, y lotes ordenados. NO incluye pipelines avanzados (voz/TTS,
-subtitulos, montaje, personajes 100% consistentes por toda una serie). Si el usuario
-quiere algo asi a escala, lo correcto es construirle un script propio encima de estos
-comandos. Empieza simple y crece segun lo que pida.
+edicion con referencia, ingredientes (referencias de personaje) y lotes ordenados.
+NO incluye pipelines avanzados (voz/TTS, subtitulos, montaje).
+
+Sobre consistencia de personaje: `refs` ayuda bastante dentro de un mismo batch,
+pero no la garantiza toma a toma. Para una serie entera vas a necesitar igual un
+personaje fijo generado una vez y reusado como ingrediente en todas las escenas —
+y aun asi habra deriva. Se honesto con el usuario sobre eso.
+
+Si el usuario quiere algo mas grande, lo correcto es construirle un script propio
+encima de estos comandos. Empieza simple y crece segun lo que pida.

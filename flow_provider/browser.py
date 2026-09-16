@@ -1,13 +1,20 @@
 """
 Lifecycle del browser Playwright para Google Flow.
-startup() → llamado desde FastAPI lifespan al arrancar.
-shutdown() → llamado desde FastAPI lifespan al cerrar.
+startup() abre Chrome con el perfil persistente; shutdown() lo cierra.
+Ambos se llaman una vez por comando de flow.py.
 """
 import asyncio
+import sys
 from pathlib import Path
 from playwright.async_api import async_playwright, BrowserContext, Page, Playwright
 
 from . import settings
+
+# --no-sandbox solo hace falta en contenedores Linux corriendo como root; en
+# Windows/macOS baja el sandbox de Chrome sin ganar nada.
+_CHROME_ARGS = ["--disable-blink-features=AutomationControlled"]
+if sys.platform.startswith("linux"):
+    _CHROME_ARGS.append("--no-sandbox")
 
 _playwright: Playwright | None = None
 _context: BrowserContext | None = None
@@ -18,6 +25,15 @@ _lock = asyncio.Lock()
 async def startup() -> None:
     global _playwright, _context, _page
     _playwright = await async_playwright().start()
+    try:
+        await _launch()
+    except Exception:
+        await shutdown()
+        raise
+
+
+async def _launch() -> None:
+    global _context, _page
 
     session_file = settings.FLOW_SESSION_FILE
     use_session = bool(session_file and Path(session_file).exists())
@@ -26,7 +42,7 @@ async def startup() -> None:
         browser = await _playwright.chromium.launch(
             headless=settings.FLOW_HEADLESS,
             channel="chrome",
-            args=["--no-sandbox", "--disable-blink-features=AutomationControlled"],
+            args=_CHROME_ARGS,
         )
         _context = await browser.new_context(
             storage_state=session_file,
@@ -53,7 +69,7 @@ async def startup() -> None:
             user_data_dir=settings.FLOW_CHROME_PROFILE or "/tmp/flow-profile",
             headless=settings.FLOW_HEADLESS,
             channel="chrome",
-            args=["--no-sandbox", "--disable-blink-features=AutomationControlled"],
+            args=_CHROME_ARGS,
             accept_downloads=True,
             viewport={"width": 1280, "height": 900},
         )
@@ -62,12 +78,20 @@ async def startup() -> None:
 
 
 async def shutdown() -> None:
+    """Cierra contexto y Playwright. Si el cierre del contexto falla igual se
+    para Playwright: si no, queda un proceso node colgado."""
     global _playwright, _context, _page
-    if _context:
-        await _context.close()
-    if _playwright:
-        await _playwright.stop()
-    _playwright = _context = _page = None
+    try:
+        if _context:
+            await _context.close()
+    except Exception as e:
+        print(f"  aviso: fallo al cerrar el contexto del navegador: {e}")
+    finally:
+        try:
+            if _playwright:
+                await _playwright.stop()
+        finally:
+            _playwright = _context = _page = None
 
 
 async def get_page() -> Page:

@@ -1,143 +1,145 @@
 """
-Espera de resultados de generación en Google Flow.
+Espera de resultados de generacion en Google Flow.
 
-Flow tiene 3 fases post-submit para imágenes:
-  Fase 1: card con blur + contador % (6 → 99)
-  Fase 2: reveal animation ~5s — img aparece pero toolbar NO interactivo
-  Fase 3: imagen lista — toolbar (more_vert) visible al hover
+Flow tiene 3 fases post-submit:
+  Fase 1: card con blur + contador % (6 -> 99)
+  Fase 2: reveal animation ~5s
+  Fase 3: media lista
 
-Incluye detección de errores de generación ("No se pudo generar") con retry automático.
+La espera es un poll: en cada vuelta se pregunta si aparecio una card NUEVA
+(por encima del baseline pre-submit) con el medio ya cargado, o si aparecio
+una card de error nueva. Detectar el error por conteo relativo al baseline es
+lo que permite que el retry siga funcionando dentro de un batch, donde el
+canvas ya trae resultados viejos de jobs anteriores.
 """
-import asyncio
 from .browser import get_page
 
+SEL_CARD         = '[aria-roledescription="draggable"]'
 SEL_RESULT_IMAGE = 'img[alt="Imagen generada"]'
-SEL_RESULT_CARD  = '[aria-roledescription="draggable"]'
+SEL_RESULT_VIDEO = 'img[alt="Miniatura de video"]'
 SEL_MORE_MENU    = '[aria-roledescription="draggable"] button:has(i:text-is("more_vert"))'
 
-# Selectores de error de generación — usar texto literal para evitar falsos positivos
-# con cards de loading que también tienen data-tile-id
-SEL_ERROR_TEXT = ':text("No se pudo generar")'
-SEL_RETRY_BTN  = 'button:has(i:text-is("refresh"))'
+# Texto de error de generacion. Se incluye el ingles por si la cuenta de Google
+# no esta en es-419.
+SEL_ERROR_TEXT = (
+    ':text("No se pudo generar"), '
+    ':text("Couldn\'t generate"), '
+    ':text("Could not generate")'
+)
+SEL_RETRY_BTN = 'button:has(i:text-is("refresh"))'
+
+POLL_MS = 1500
 
 
-async def _handle_generation_error(page, max_retries: int, attempt: int) -> bool:
-    """Detecta card de error y clicka Reintentar. Retorna True si reintentó."""
-    error_card = page.locator(SEL_ERROR_TEXT)
-    if await error_card.count() == 0:
-        return False
-
-    if attempt >= max_retries:
-        raise Exception(
-            f"Generación falló {max_retries + 1} veces consecutivas. "
-            "Flow reporta: 'No se pudo generar'."
-        )
-
-    print(f"  ⚠️  Error de generación detectado (intento {attempt + 1}/{max_retries + 1}). Reintentando...")
-    retry_btn = page.locator('[data-tile-id] ' + SEL_RETRY_BTN)
-    if await retry_btn.count() > 0:
-        await retry_btn.first.click()
-        await page.wait_for_timeout(3000)
-        # Esperar que el card de error desaparezca antes de re-poll
-        try:
-            await error_card.first.wait_for(state="hidden", timeout=10_000)
-        except Exception:
-            pass
-        return True
-
-    # Si no hay botón retry, no crashear — puede ser falso positivo transiente
-    print("  ⚠️  Texto de error detectado pero sin botón Reintentar. Continuando espera...")
-    return False
-
-
-async def wait_for_image(timeout_ms: int = 90000, max_retries: int = 2, pre_submit_count: int | None = None) -> None:
-    """Espera que la imagen sea generada y que el toolbar esté listo. Reintenta si Flow falla."""
-    page = await get_page()
-
-    success_loc = page.locator(SEL_RESULT_IMAGE)
-    error_loc   = page.locator(SEL_ERROR_TEXT)
-    race        = success_loc.or_(error_loc)
-
-    for attempt in range(max_retries + 1):
-        try:
-            await race.first.wait_for(state="visible", timeout=timeout_ms)
-        except Exception:
-            raise TimeoutError(f"Generación de imagen no completó en {timeout_ms // 1000}s")
-
-        # ¿Error de generación?
-        if await error_loc.count() > 0 and await success_loc.count() == 0:
-            if await _handle_generation_error(page, max_retries, attempt):
-                continue
-        break
-
-    # Confirmar carga según estrategia:
-    if pre_submit_count is not None:
-        # Modo estricto: esperar que la cantidad de cards sea MAYOR que el baseline
-        await page.wait_for_function(
-            f"""() => {{
-                const cards = document.querySelectorAll('[aria-roledescription="draggable"]');
-                if (cards.length <= {pre_submit_count}) return false;
-                // La más reciente es la índice 0
-                const img = cards[0].querySelector('img[alt="Imagen generada"]');
-                return img && img.complete && img.naturalWidth > 0;
-            }}""",
-            timeout=timeout_ms
-        )
+def _js_new_media_ready(sel_media: str, pre_submit_count: int | None) -> str:
+    """JS que devuelve true cuando hay una card nueva con el medio ya cargado."""
+    if pre_submit_count is None:
+        baseline = "null"
     else:
-        # Confirmar que la imagen general esté cargada
-        await page.wait_for_function(
-            """() => {
-                const img = document.querySelector('img[alt="Imagen generada"]');
-                return img && img.complete && img.naturalWidth > 0;
-            }""",
-            timeout=timeout_ms
-        )
-    # Hover omitido para evitar apertura accidental de visualizadores a pantalla completa
-    return
+        baseline = str(pre_submit_count)
+    return f"""() => {{
+        const cards = document.querySelectorAll('{SEL_CARD}');
+        const baseline = {baseline};
+        if (baseline !== null && cards.length <= baseline) return false;
+        // Flow prepende: la card mas nueva es la indice 0.
+        const card = cards[0];
+        if (!card) return false;
+        const media = card.querySelector('{sel_media}');
+        if (!media) return false;
+        return media.complete === undefined || (media.complete && media.naturalWidth > 0);
+    }}"""
 
 
-async def wait_for_video(timeout_ms: int = 360000, max_retries: int = 2, pre_submit_count: int | None = None) -> None:
-    """Espera que el video sea generado. Reintenta si Flow falla. Default 6 min."""
+async def _count_errors(page) -> int:
+    try:
+        return await page.locator(SEL_ERROR_TEXT).count()
+    except Exception:
+        return 0
+
+
+async def _click_retry(page) -> bool:
+    """Clickea Reintentar en la card de error mas nueva. True si pudo."""
+    retry_btn = page.locator(f'{SEL_CARD} {SEL_RETRY_BTN}')
+    if await retry_btn.count() == 0:
+        retry_btn = page.locator(SEL_RETRY_BTN)
+    if await retry_btn.count() == 0:
+        return False
+    await retry_btn.first.click()
+    await page.wait_for_timeout(3000)
+    return True
+
+
+async def _wait_for_media(
+    sel_media: str,
+    kind: str,
+    timeout_ms: int,
+    max_retries: int,
+    pre_submit_count: int | None,
+) -> None:
     page = await get_page()
+    js = _js_new_media_ready(sel_media, pre_submit_count)
 
-    success_loc = page.locator('img[alt="Miniatura de video"]')
-    error_loc   = page.locator(SEL_ERROR_TEXT)
-    race        = success_loc.or_(error_loc)
+    # Baseline de errores: el canvas puede arrastrar cards de error de jobs
+    # anteriores que ya se dieron por perdidos. Solo reaccionamos a los nuevos.
+    error_baseline = await _count_errors(page)
 
     for attempt in range(max_retries + 1):
-        try:
-            await race.first.wait_for(state="visible", timeout=timeout_ms)
-        except Exception:
-            raise TimeoutError(f"Generación de video no completó en {timeout_ms // 1000}s")
+        waited = 0
+        while waited < timeout_ms:
+            try:
+                if await page.evaluate(js):
+                    return
+            except Exception:
+                pass  # navegacion/render intermedio: se reintenta en el proximo poll
 
-        if await error_loc.count() > 0 and await success_loc.count() == 0:
-            if await _handle_generation_error(page, max_retries, attempt):
-                continue
-        break
+            if await _count_errors(page) > error_baseline:
+                if attempt >= max_retries:
+                    raise RuntimeError(
+                        f"Generacion de {kind} fallo {max_retries + 1} veces seguidas. "
+                        "Flow reporta: 'No se pudo generar'."
+                    )
+                print(f"  Error de generacion (intento {attempt + 1}/{max_retries + 1}). Reintentando...")
+                if await _click_retry(page):
+                    break  # sale del while -> siguiente attempt
+                print("  Texto de error sin boton Reintentar. Sigo esperando...")
+                error_baseline = await _count_errors(page)
 
-    if pre_submit_count is not None:
-        await page.wait_for_function(
-            f"""() => {{
-                const cards = document.querySelectorAll('[aria-roledescription="draggable"]');
-                if (cards.length <= {pre_submit_count}) return false;
-                const thumb = cards[0].querySelector('img[alt="Miniatura de video"]');
-                return !!thumb;
-            }}""",
-            timeout=timeout_ms
-        )
+            await page.wait_for_timeout(POLL_MS)
+            waited += POLL_MS
+        else:
+            raise TimeoutError(f"Generacion de {kind} no completo en {timeout_ms // 1000}s")
 
-    # Confirmar carga de video (readyState >= 2)
+    raise TimeoutError(f"Generacion de {kind} no completo tras {max_retries + 1} intentos")
+
+
+async def wait_for_image(
+    timeout_ms: int = 90_000,
+    max_retries: int = 2,
+    pre_submit_count: int | None = None,
+) -> None:
+    """Espera a que aparezca una imagen NUEVA y cargada. Reintenta si Flow falla."""
+    await _wait_for_media(SEL_RESULT_IMAGE, "imagen", timeout_ms, max_retries, pre_submit_count)
+
+
+async def wait_for_video(
+    timeout_ms: int = 360_000,
+    max_retries: int = 2,
+    pre_submit_count: int | None = None,
+) -> None:
+    """Espera a que aparezca un video NUEVO. Reintenta si Flow falla. Default 6 min."""
+    await _wait_for_media(SEL_RESULT_VIDEO, "video", timeout_ms, max_retries, pre_submit_count)
+
+    # Best effort: confirmar que el <video> tenga algo que descargar.
+    page = await get_page()
     try:
         await page.wait_for_function(
-            """() => {
-                const card = document.querySelector('[aria-roledescription="draggable"]');
+            f"""() => {{
+                const card = document.querySelector('{SEL_CARD}');
                 const vid = card ? card.querySelector('video') : document.querySelector('video');
                 if (!vid) return false;
                 return vid.readyState >= 2 || (vid.src && vid.src.length > 0);
-            }""",
-            timeout=80000
+            }}""",
+            timeout=80_000,
         )
     except Exception:
-        pass  # Fallback: flow a veces renderiza miniatura y oculta src
-    # Hover omitido para evitar apertura accidental de visualizadores a pantalla completa
-    return
+        pass  # Flow a veces muestra miniatura y oculta el src; la descarga igual funciona

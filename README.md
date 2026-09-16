@@ -39,8 +39,16 @@ python flow.py login
 ```powershell
 python flow.py image --prompt "a cute robot waving, cinematic, vertical" --name prueba
 python flow.py video --prompt "the robot waves slowly" --start outputs/prueba.png --name prueba_vid
+python flow.py video --prompt "they argue" --refs a.png,b.png --name escena   # ingredientes
 python flow.py batch examples/guion_ejemplo.json
+python flow.py batch examples/guion_ingredientes.json
 python flow.py clean demo_flow     # borrar lo de un proyecto cuando termines
+```
+
+Tests del cableado de la CLI (no tocan el navegador ni tu cuenta):
+
+```powershell
+python -m unittest discover -s tests
 ```
 
 Los comandos sueltos caen en `outputs/`; cada `batch` se agrupa en `outputs/<proyecto>/`.
@@ -61,3 +69,30 @@ Los comandos sueltos caen en `outputs/`; cada `batch` se agrupa en `outputs/<pro
 - La sesion es **permanente**: no expira por tiempo mientras conserves `session/`.
 - Usa el Google Chrome real de tu sistema.
 - No necesita ninguna API key.
+- La UI de Flow esta en espanol (`es-419`): los selectores dependen de eso.
+
+> **Aviso:** automatizar labs.google va contra los Terminos de Servicio de Google.
+> La cuenta que uses puede ser suspendida. Usa una cuenta secundaria, no la principal.
+
+## Cambios de este fork
+
+Fork de [BRPLia/google-flow-skill-v1](https://github.com/BRPLia/google-flow-skill-v1).
+
+Arreglos:
+- `--image` / `--refs` ahora **si** adjuntan la referencia al prompt (antes la imagen
+  quedaba suelta en el canvas y la generacion la ignoraba).
+- El reintento ante "No se pudo generar" vuelve a funcionar dentro de un `batch`
+  (antes solo servia para el primer job y despues se comia el timeout entero).
+- `--model`, `--ratio`, `--count` y `--res` se validan **antes** de abrir el navegador;
+  un nombre mal escrito ya no genera en silencio con otro modelo.
+- `--count N` baja las N variantes (`<name>_1`..`<name>_N`), no solo la primera.
+- `batch_report.json` se escribe siempre, incluso si falla al crear el proyecto.
+- El navegador se cierra aunque falle el cierre del contexto (no quedan procesos colgados).
+- `--no-sandbox` solo en Linux.
+
+Nuevo:
+- **Modo Ingredientes en la CLI**: `--refs` / `"refs": [...]` en el guion. Referencias por
+  archivo local o por `name` de un job anterior del mismo batch (reusa el asset del
+  proyecto Flow en vez de volver a subirlo). Es lo que da consistencia de personaje.
+- `--res` para elegir resolucion de descarga.
+- Tests del cableado sin navegador (`tests/`).

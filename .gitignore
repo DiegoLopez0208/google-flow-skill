@@ -1,6 +1,8 @@
 # Python
 __pycache__/
 *.pyc
+.venv/
+venv/
 
 # Variables de entorno (por si alguien agrega una .env)
 .env

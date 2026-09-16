@@ -19,6 +19,7 @@ python flow.py status                        # ver si hay sesion
 python flow.py image --prompt "..." --name escena1
 python flow.py video --prompt "..." --name escena1
 python flow.py video --prompt "..." --start outputs/escena1.png --name escena1_vid
+python flow.py video --prompt "..." --refs fresa.png,banano.png --name escena1_vid
 python flow.py batch guion.json              # varios trabajos EN ORDEN
 python flow.py clean nombre_proyecto         # borrar resultados de un proyecto
 ```
@@ -28,6 +29,10 @@ python flow.py clean nombre_proyecto         # borrar resultados de un proyecto
   El batch se guarda en `outputs/<project>/`. Para encadenar img->video dentro de un batch,
   el `start` del video puede ser solo el `name` del job de imagen anterior.
 - Si una escena trae prompt de imagen Y de video: genera la imagen y usala como `--start` del video.
+- Si la escena tiene PERSONAJES que deben repetirse entre escenas: generalos una vez como
+  imagenes y pasalos con `refs` (modo Ingredientes) en cada video. Dentro de un batch alcanza
+  con el `name` del job de imagen.
+- `--count N` baja las N variantes (`<name>_1`..`<name>_N`), no una sola.
 - La narracion/voz NO va a Flow. Solo imagen y video.
 - NO reanuda proyectos de Flow: cada corrida es un proyecto nuevo; el encadenamiento es por archivos.
 - Sé ordenado y honesto sobre los limites (ver seccion 7 de `SKILL.md`).

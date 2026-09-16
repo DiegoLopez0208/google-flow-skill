@@ -7,6 +7,32 @@ import re
 
 
 SEL_ADD_INGREDIENT = 'button[aria-haspopup="dialog"]:has-text("Crear")'
+
+RE_UPLOAD_MEDIA = re.compile(r"(Cargar medios|Upload media|Subir imagen)", re.IGNORECASE)
+
+RE_ADD_TO_PROMPT = re.compile(
+    r"(Agregar a la instrucci|Añadir a la instrucci|Anadir a la instrucci|Add to instruction|Add to prompt)",
+    re.IGNORECASE,
+)
+
+
+async def click_add_to_prompt(page, timeout_ms: int = 15_000, scope: str | None = None) -> bool:
+    """Clickea 'Agregar a la instruccion' en el panel de medios. True si pudo.
+
+    Es el paso que adjunta la imagen al prompt. Sin el, Flow la deja en el
+    canvas como asset suelto y la generacion la ignora.
+    """
+    root = page.locator(scope) if scope else page
+    btn = root.locator('button, [role="button"]').filter(has_text=RE_ADD_TO_PROMPT).first
+    try:
+        await btn.wait_for(state="visible", timeout=timeout_ms)
+        await btn.click()
+        await page.wait_for_timeout(1000)
+        return True
+    except Exception:
+        return False
+
+
 async def select_ingredients_by_name(uuids: list[str]) -> None:
     """Marca items del canvas como ingredientes a través del Dialog Modal de Flow, buscando por UUID."""
     page = await get_page()
@@ -81,19 +107,9 @@ async def select_ingredients_by_name(uuids: list[str]) -> None:
         await target_img.first.click()
         await page.wait_for_timeout(1500)
         
-        # Buscar el botón 'Agregar a la instrucción' o su equivalente en inglés dentro del panel flotante
-        import re
-        add_btn = page.locator(PANEL_RECURSOS).locator('button, [role="button"]').filter(
-            has_text=re.compile(r"(Agregar a la instrucción|Add to instrucción|Add to instruction|Add to prompt)", re.IGNORECASE)
-        ).first
-        
-        try:
-            # Esperar a que el botón de agregar esté visible en la previsualización
-            await add_btn.wait_for(state="visible", timeout=6000)
-            await add_btn.click()
-            await page.wait_for_timeout(1000)
-        except Exception:
-            # Si no se encuentra o ya se cerró el panel, usar Escape como fallback
+        # Confirmar con 'Agregar a la instruccion' dentro del panel flotante.
+        if not await click_add_to_prompt(page, timeout_ms=6000, scope=PANEL_RECURSOS):
+            # Si no se encuentra o ya se cerro el panel, usar Escape como fallback
             await page.keyboard.press("Escape")
             await page.wait_for_timeout(1000)
 
@@ -111,9 +127,8 @@ async def upload_standalone_image(image_path: str) -> None:
     await page.wait_for_timeout(2_000)
     
     # 3. Click en Cargar medios / Subir imagen
-    import re
     upload_btn = page.locator('button, [role="button"]').filter(
-        has_text=re.compile(r"(Cargar medios|Upload media|Subir imagen)", re.IGNORECASE)
+        has_text=RE_UPLOAD_MEDIA
     ).first
     
     if await upload_btn.count() == 0:
@@ -125,7 +140,18 @@ async def upload_standalone_image(image_path: str) -> None:
     file_chooser = await fc_info.value
     await file_chooser.set_files(str(image_path))
     
-    # 4. Esperar de forma dinámica y rigurosa usando la cuenta previa (Igual que en test-flow 5)
+    # 4. Confirmar con 'Agregar a la instruccion'. SIN esto la imagen queda como
+    #    asset suelto en el canvas y NO condiciona la generacion.
+    added = await click_add_to_prompt(page, timeout_ms=15_000)
+    if not added:
+        await page.keyboard.press("Escape")
+        await page.wait_for_timeout(1000)
+        raise RuntimeError(
+            "Se subio la imagen pero no aparecio 'Agregar a la instruccion'. "
+            "La imagen de referencia no quedo adjunta al prompt."
+        )
+
+    # 5. Esperar a que la card aparezca en el canvas (confirma el upload).
     await page.wait_for_function(
         f"""() => {{
             const cards = document.querySelectorAll('[aria-roledescription="draggable"]');
@@ -135,10 +161,6 @@ async def upload_standalone_image(image_path: str) -> None:
         }}""",
         timeout=60_000,
     )
-    
-    # 5. Cerrar el panel presionando Escape una vez confirmado el upload en el canvas
-    await page.keyboard.press("Escape")
-    await page.wait_for_timeout(1000)
 
 
 
@@ -164,9 +186,8 @@ async def upload_frame(file_path: str, slot: str = "initial") -> None:
         await target_slot.click()
         await page.wait_for_timeout(3000)
 
-        import re
         upload_btn = page.locator('button, [role="button"], div').filter(
-            has_text=re.compile(r"(Cargar medios|Upload media|Subir imagen)", re.IGNORECASE)
+            has_text=RE_UPLOAD_MEDIA
         ).first
         if await upload_btn.count() == 0:
             raise Exception("Botón de subida ('Cargar medios' / 'Upload') no encontrado para el slot.")
@@ -181,13 +202,9 @@ async def upload_frame(file_path: str, slot: str = "initial") -> None:
             file_chooser = await fc_info.value
             await file_chooser.set_files(file_path)
 
-        # Confirmar con 'Agregar a la instrucción' para insertar el frame en el slot.
-        add_btn = page.locator('button, [role="button"]').filter(
-            has_text=re.compile(r"(Agregar a la instrucción|Add to instruction|Add to prompt)", re.IGNORECASE)
-        ).first
-        await add_btn.wait_for(state="visible", timeout=15000)
-        await add_btn.click()
-        await page.wait_for_timeout(1000)
+        # Confirmar con 'Agregar a la instruccion' para insertar el frame en el slot.
+        if not await click_add_to_prompt(page, timeout_ms=15_000):
+            raise RuntimeError("No aparecio 'Agregar a la instruccion' al cargar el fotograma.")
 
         await page.wait_for_function(
             f"""() => {{
@@ -227,14 +244,8 @@ async def select_frame_from_project(uuid: str, slot: str = "initial") -> None:
     await target_img.first.click()
     await page.wait_for_timeout(1000)
     
-    # Confirmar selección con el botón 'Agregar a la instrucción'
-    import re
-    add_btn = page.locator('button, [role="button"]').filter(
-        has_text=re.compile(r"(Agregar a la instrucción|Add to instruction|Add to prompt)", re.IGNORECASE)
-    ).first
-    if await add_btn.count() > 0:
-        await add_btn.click()
-        await page.wait_for_timeout(1000)
+    # Confirmar seleccion con el boton 'Agregar a la instruccion'
+    await click_add_to_prompt(page, timeout_ms=6000)
     
     # Esperar que cargue en el slot
     await page.wait_for_function(

@@ -40,6 +40,28 @@ SEL_MODEL_VID = {
 
 import re
 
+
+def _validate(value, table, label):
+    """Falla temprano ante un nombre invalido en vez de generar con otra cosa."""
+    if value not in table:
+        raise ValueError(f"{label} '{value}' no valido. Opciones: {list(table)}")
+    return table[value]
+
+
+async def _select_model(page, model_sel: str, model: str) -> None:
+    """Abre el submenu de modelo y elige. Falla si el submenu no aparece."""
+    model_trigger = page.locator('[role="menu"] button[aria-haspopup="menu"], [role="menu"] button[aria-expanded]')
+    if await model_trigger.count() == 0:
+        raise RuntimeError(
+            f"No se encontro el selector de modelo para elegir '{model}'. "
+            "La UI de Flow pudo cambiar."
+        )
+    await model_trigger.first.click()
+    await page.wait_for_timeout(300)
+    await page.locator(model_sel).first.click()
+    await page.wait_for_timeout(300)
+
+
 async def _click_menu_option(page, sel_id: str, texts: list[str]) -> None:
     """Intenta hacer click en una opción del menú por su selector de ID, y si falla o no es visible, busca por texto y rol."""
     loc_id = page.locator(sel_id)
@@ -84,27 +106,17 @@ async def select_image_mode(
     await page.wait_for_timeout(300)
 
     # Aspect ratio
-    ratio_sel = SEL_RATIO.get(aspect_ratio)
-    if not ratio_sel:
-        raise ValueError(f"aspect_ratio '{aspect_ratio}' no válido. Opciones: {list(SEL_RATIO)}")
+    ratio_sel = _validate(aspect_ratio, SEL_RATIO, "aspect_ratio")
     await _click_menu_option(page, ratio_sel, [aspect_ratio])
     await page.wait_for_timeout(300)
 
     # Seleccionar modelo
-    model_sel = SEL_MODEL_IMG.get(model)
-    if model_sel:
-        model_trigger = page.locator('[role="menu"] button[aria-haspopup="menu"], [role="menu"] button[aria-expanded]')
-        if await model_trigger.count() > 0:
-            await model_trigger.first.click()
-            await page.wait_for_timeout(300)
-            await page.locator(model_sel).first.click()
-            await page.wait_for_timeout(300)
+    await _select_model(page, _validate(model, SEL_MODEL_IMG, "modelo de imagen"), model)
 
     # Cantidad
-    count_sel = SEL_COUNT.get(count)
-    if count_sel:
-        await _click_menu_option(page, count_sel, [f"{count}x", f"{count} var", str(count)])
-        await page.wait_for_timeout(300)
+    count_sel = _validate(count, SEL_COUNT, "count")
+    await _click_menu_option(page, count_sel, [f"{count}x", f"{count} var", str(count)])
+    await page.wait_for_timeout(300)
 
     # Cerrar panel
     await page.keyboard.press("Escape")
@@ -130,6 +142,8 @@ async def select_video_mode(
     await page.wait_for_timeout(300)
 
     # Sub-tab de modo
+    if mode not in ("texto", "fotogramas", "ingredientes"):
+        raise ValueError(f"mode '{mode}' no valido. Opciones: texto, fotogramas, ingredientes")
     if mode == "fotogramas":
         await _click_menu_option(page, SEL_TAB_FRAMES, ["Fotogramas", "Frames"])
     elif mode == "ingredientes":
@@ -137,27 +151,17 @@ async def select_video_mode(
     await page.wait_for_timeout(300)
 
     # Aspect ratio
-    ratio_sel = SEL_RATIO.get(aspect_ratio)
-    if not ratio_sel:
-        raise ValueError(f"aspect_ratio '{aspect_ratio}' no válido.")
+    ratio_sel = _validate(aspect_ratio, SEL_RATIO, "aspect_ratio")
     await _click_menu_option(page, ratio_sel, [aspect_ratio])
     await page.wait_for_timeout(300)
 
     # Seleccionar modelo
-    model_sel = SEL_MODEL_VID.get(model)
-    if model_sel:
-        model_trigger = page.locator('[role="menu"] button[aria-haspopup="menu"], [role="menu"] button[aria-expanded]')
-        if await model_trigger.count() > 0:
-            await model_trigger.first.click()
-            await page.wait_for_timeout(300)
-            await page.locator(model_sel).first.click()
-            await page.wait_for_timeout(300)
+    await _select_model(page, _validate(model, SEL_MODEL_VID, "modelo de video"), model)
 
     # Cantidad
-    count_sel = SEL_COUNT.get(count)
-    if count_sel:
-        await _click_menu_option(page, count_sel, [f"{count}x", f"{count} var", str(count)])
-        await page.wait_for_timeout(300)
+    count_sel = _validate(count, SEL_COUNT, "count")
+    await _click_menu_option(page, count_sel, [f"{count}x", f"{count} var", str(count)])
+    await page.wait_for_timeout(300)
 
     # Cerrar panel
     await page.keyboard.press("Escape")
