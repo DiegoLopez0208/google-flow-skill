@@ -24,7 +24,7 @@ async def submit_prompt(prompt: str, typing_delay_ms: int = 5) -> None:
     box = page.locator(SEL_PROMPT)
     if await box.count() == 0:
         raise RuntimeError("Could not find Flow's prompt box.")
-    await box.first.click()
+    await box.first.click(force=True)
     await page.keyboard.press("Control+a")
     await page.keyboard.type(prompt, delay=typing_delay_ms)
     await page.wait_for_timeout(500)
@@ -35,11 +35,11 @@ async def submit_prompt(prompt: str, typing_delay_ms: int = 5) -> None:
     for _ in range(3):
         try:
             await submit.first.wait_for(state="visible", timeout=6000)
-            await submit.first.click()
+            await submit.first.click(force=True)
             return
         except Exception:
             await close_overlays(page)
-            await box.first.click()
+            await box.first.click(force=True)
             await page.wait_for_timeout(800)
     raise RuntimeError(
         "Could not find the submit button (Iniciar generacion) after three tries."

@@ -1,0 +1,42 @@
+{
+  "project": "frutinovela_cap1",
+  "defaults": {
+    "ratio": "9:16",
+    "video_model": "Veo 3.1 - Lite"
+  },
+  "jobs": [
+    {
+      "type": "video",
+      "name": "esc1_descubrimiento",
+      "refs": [
+        "outputs/frutinovela_personajes/fresa_1.png",
+        "outputs/frutinovela_personajes/banano_1.png"
+      ],
+      "prompt": "The strawberry in the floral dress walks in and freezes, seeing the banana holding a chocolate-covered spoon. Slow dramatic push-in on her shocked face. She says, trembling: '¿Otra vez con la cuchara?'. Pixar-style 3D animation, sunny kitchen, soft cinematic lighting, vertical 9:16, telenovela framing"
+    },
+    {
+      "type": "video",
+      "name": "esc2_excusa",
+      "refs": [
+        "outputs/frutinovela_personajes/banano_1.png"
+      ],
+      "prompt": "The banana drops the spoon and raises both hands, sweating, forcing a charming smile at the camera. He says: 'Mi amor, puedo explicarlo'. Slow zoom on his guilty grin. Pixar-style 3D animation, sunny kitchen, soft cinematic lighting, vertical 9:16, telenovela framing"
+    },
+    {
+      "type": "video",
+      "name": "esc3_villano",
+      "refs": [
+        "outputs/frutinovela_personajes/limon.png"
+      ],
+      "prompt": "The green lime in the purple cape steps out of the shadows, arms crossed, lit from below. He laughs and says: 'Yo se los presenté'. Dramatic slow dolly in on his crooked grin. Pixar-style 3D animation, sunny kitchen, soft cinematic lighting, vertical 9:16, telenovela framing"
+    },
+    {
+      "type": "video",
+      "name": "esc4_final",
+      "refs": [
+        "outputs/frutinovela_personajes/fresa_1.png"
+      ],
+      "prompt": "The strawberry turns away with dignity, one tear rolling down, and declares: 'Se acabó. Me quedo con la heladera'. She walks off frame. Slow motion, warm backlight. Pixar-style 3D animation, sunny kitchen, soft cinematic lighting, vertical 9:16, telenovela framing"
+    }
+  ]
+}

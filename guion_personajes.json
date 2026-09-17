@@ -1,0 +1,27 @@
+{
+  "project": "frutinovela_personajes",
+  "defaults": {
+    "ratio": "9:16",
+    "image_model": "Nano Banana 2"
+  },
+  "jobs": [
+    {
+      "type": "image",
+      "name": "fresa",
+      "count": 2,
+      "prompt": "A dramatic strawberry character with huge glossy expressive eyes and very long eyelashes, one leaf tilted like hair, looking betrayed and tearful, telenovela heroine energy. Pixar-style 3D animation, expressive cartoon character, glossy vibrant colors, soft cinematic lighting, sunny kitchen countertop background, full body, centered, vertical composition"
+    },
+    {
+      "type": "image",
+      "name": "banano",
+      "count": 2,
+      "prompt": "A charming banana character, confident smirk, one eyebrow raised, slicked peel like styled hair, soap-opera heartthrob energy, caught red-handed. Pixar-style 3D animation, expressive cartoon character, glossy vibrant colors, soft cinematic lighting, sunny kitchen countertop background, full body, centered, vertical composition"
+    },
+    {
+      "type": "image",
+      "name": "limon",
+      "count": 2,
+      "prompt": "A villainous green lime character with narrow scheming eyes and a crooked smug grin, dramatic shadow across the face, telenovela antagonist energy. Pixar-style 3D animation, expressive cartoon character, glossy vibrant colors, soft cinematic lighting, sunny kitchen countertop background, full body, centered, vertical composition"
+    }
+  ]
+}

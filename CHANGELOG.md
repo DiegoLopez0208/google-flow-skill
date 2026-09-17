@@ -3,6 +3,18 @@
 All notable changes to this fork. Dates are when the work was verified against
 the live Flow UI, not when Google shipped a change.
 
+## [2.0.1] - 2026-09-17
+
+### Fixed
+- Clicks on the prompt bar are forced. `flow-border-glow` animates in a loop, so
+  Playwright never considered the settings button "stable" and every run died
+  with `Locator.click: Timeout` before generating anything.
+
+### Changed
+- `ESTIMATED_COST["image"]` is now 0, measured: generating with Nano Banana 2
+  left the balance untouched (57 before, 57 after). Video measured at exactly
+  10 credits each — four scenes took the balance from 57 to 17.
+
 ## [2.0.0] - 2026-09-16
 
 Google rewrote Flow: it moved to `flow.google.com` and switched from

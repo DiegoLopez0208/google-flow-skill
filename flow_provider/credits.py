@@ -76,8 +76,11 @@ async def low_credits_notice() -> str | None:
 # Rough cost per generation, only so we can warn before spending.
 # These are NOT official figures: Google does not publish them. They are used to
 # advise, never to bill and never to decide anything silently.
+#
+# Images measured at 0 on 2026-09-17: generating with Nano Banana 2 left the
+# balance untouched (57 before, 57 after). Video is the one that costs.
 ESTIMATED_COST = {
-    "image": 1,
+    "image": 0,
     "video": 10,
 }
 

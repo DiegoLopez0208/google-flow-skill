@@ -54,7 +54,9 @@ async def _click_option(page, option: tuple[str, str], label: str) -> None:
     for term in (icon, text):
         loc = page.locator(f'[role="radio"]:has-text("{term}")')
         if await loc.count() and await loc.first.is_visible():
-            await loc.first.click()
+            # force: the prompt bar animates non-stop (flow-border-glow loops),
+            # so Playwright never sees these controls settle.
+            await loc.first.click(force=True)
             await page.wait_for_timeout(500)
             return
     raise RuntimeError(
@@ -82,7 +84,7 @@ async def _open_panel(page) -> None:
         # Move the mouse off the cards: a hovered tile's hotbar covers the bar.
         await page.mouse.move(5, 5)
         await page.wait_for_timeout(400)
-        await btn.first.click()
+        await btn.first.click(force=True)
         try:
             await page.locator('[role="radio"]').first.wait_for(state="visible", timeout=5000)
             return
@@ -103,7 +105,7 @@ async def _select_model(page, model: str) -> None:
     btn = page.locator(SEL_MODEL_BTN)
     if await btn.count() == 0:
         raise RuntimeError(f"Could not find the model picker to select '{model}'.")
-    await btn.first.click()
+    await btn.first.click(force=True)
     await page.wait_for_timeout(1500)
 
     items = page.locator('[role="menuitem"]')
@@ -127,7 +129,7 @@ async def _select_model(page, model: str) -> None:
             f"Model '{model}' is not in Flow's menu. "
             "Google may have retired or renamed it."
         )
-    await target.click()
+    await target.click(force=True)
     await page.wait_for_timeout(800)
 
 
