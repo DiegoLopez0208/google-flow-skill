@@ -124,6 +124,13 @@ async def upload_frame(file_path_or_id: str, slot: str = "start") -> str:
     await close_overlays(page)
     target = page.locator(SEL_SLOT_START if slot == "start" else SEL_SLOT_END)
     if await target.count() == 0:
+        # Uploading media and then switching to frames already drops it into the
+        # first slot: the label is replaced by a thumbnail with a cancel button.
+        # So a missing slot button means it is filled, not missing.
+        filled = page.locator(f'{SEL_FRAME_BAR} button:has-text("cancel")')
+        if await filled.count():
+            print(f"  the {slot} frame slot is already filled")
+            return asset_id
         raise RuntimeError(
             f"The '{slot}' frame slot is not on screen. Is the panel in frames "
             "sub-mode? (select_video_mode(mode='frames'))"

@@ -28,6 +28,13 @@ the live Flow UI, not when Google shipped a change.
 
 ### Fixed
 - `canvas.py` used `Path` without importing it.
+- Frames mode now uploads local files from the **ingredients** sub-mode first.
+  Frames replaces the add-media button with the slots, so there is no way in
+  once you are there; and Flow remembers the sub-mode, so a run can start
+  already on frames.
+- Uploading media and then switching to frames drops it straight into the first
+  slot, replacing the "Iniciar" label with a thumbnail. A missing slot button
+  therefore means filled, not missing, and is no longer treated as an error.
 
 ### Changed
 - Video only offers 16:9 and 9:16; the other three ratios are image-only, and

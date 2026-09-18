@@ -253,14 +253,19 @@ class BatchWiringTest(unittest.TestCase):
             ],
         })
         self.assertEqual(code, 0)
-        # the video goes into frames sub-mode, not ingredients
+        # A local file is uploaded from ingredients first (frames hides the add
+        # button), and the generation itself runs in frames.
         modes = [c[2]["mode"] for c in self.fake.find("select_video_mode")]
-        self.assertEqual(modes, ["frames"])
-        # and the earlier job's PNG is loaded into the start slot
+        self.assertEqual(modes[-1], "frames")
+        self.assertIn("ingredients", modes)
+        # the PNG is uploaded first, and the slot gets the resulting asset id
+        uploads = self.fake.find("upload_media")
+        self.assertEqual(len(uploads), 1)
+        self.assertTrue(uploads[0][1][0].endswith("a.png"), uploads[0])
         frames = self.fake.find("upload_frame")
         self.assertEqual(len(frames), 1)
         self.assertEqual(frames[0][2]["slot"], "start")
-        self.assertTrue(frames[0][1][0].endswith("a.png"), frames[0])
+        self.assertTrue(frames[0][1][0].startswith("uuid-subido"), frames[0])
 
     def test_start_and_end_fill_both_slots(self):
         code = self._run_batch({

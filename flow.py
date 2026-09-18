@@ -494,6 +494,21 @@ async def _gen_video(prompt, ratio, model, count, start, end, refs, out_path,
     else:
         mode = "text"
 
+    # Local files have to be uploaded BEFORE switching to frames: that sub-mode
+    # replaces the add-media button with the frame slots, leaving no way in.
+    frame_ids = {}
+    if mode == "frames":
+        pending = [(slot, path) for slot, path in (("start", start), ("end", end))
+                   if path and Path(path).exists()]
+        if pending:
+            # Ingredients, not text: Flow remembers the sub-mode, so it may
+            # already be on frames, and only ingredients shows the add button.
+            await flow.select_video_mode(mode="ingredients", model=model,
+                                         aspect_ratio=ratio, count=count,
+                                         duration=duration, gen_resolution=gen_res)
+            for slot, path in pending:
+                frame_ids[slot] = await flow.upload_media(path)
+
     quoted = await flow.select_video_mode(mode=mode, model=model, aspect_ratio=ratio,
                                           count=count, duration=duration,
                                           gen_resolution=gen_res)
@@ -502,9 +517,9 @@ async def _gen_video(prompt, ratio, model, count, start, end, refs, out_path,
 
     if mode == "frames":
         if start:
-            await flow.upload_frame(start, "start")
+            await flow.upload_frame(frame_ids.get("start", start), "start")
         if end:
-            await flow.upload_frame(end, "end")
+            await flow.upload_frame(frame_ids.get("end", end), "end")
     elif mode == "ingredients":
         await _attach_refs(refs)
 
