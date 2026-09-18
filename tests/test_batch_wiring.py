@@ -33,6 +33,7 @@ class FakeFlow:
         self._n = 0
         self._vivo = True
         self.creditos = None
+        self.quoted_cost = None
 
     def _log(self, name, *args, **kwargs):
         self.calls.append((name, args, kwargs))
@@ -78,6 +79,13 @@ class FakeFlow:
 
     async def select_video_mode(self, **kw):
         self._log("select_video_mode", **kw)
+        return self.quoted_cost
+
+    async def upload_frame(self, path, slot="start"):
+        self._log("upload_frame", path, slot=slot)
+        asset_id = f"uuid-frame-{slot}"
+        self.assets.append({"id": asset_id, "kind": "image", "ready": True})
+        return asset_id
 
     async def upload_media(self, path):
         self._log("upload_media", path)
@@ -236,7 +244,7 @@ class BatchWiringTest(unittest.TestCase):
         self.assertIn("no_existe", report[0]["error"])
         self.assertTrue(report[1]["ok"])
 
-    def test_frames_mode_fails_with_a_clear_message(self):
+    def test_frames_mode_pins_the_first_frame(self):
         code = self._run_batch({
             "project": "demo",
             "jobs": [
@@ -244,11 +252,39 @@ class BatchWiringTest(unittest.TestCase):
                 {"type": "video", "name": "b", "start": "a", "prompt": "p"},
             ],
         })
-        self.assertEqual(code, 1)
-        report = json.loads((self.out / "demo" / "batch_report.json").read_text(encoding="utf-8"))
-        self.assertTrue(report[0]["ok"])
-        self.assertIn("Frames mode", report[1]["error"])
-        self.assertIn("--refs", report[1]["error"])
+        self.assertEqual(code, 0)
+        # the video goes into frames sub-mode, not ingredients
+        modes = [c[2]["mode"] for c in self.fake.find("select_video_mode")]
+        self.assertEqual(modes, ["frames"])
+        # and the earlier job's PNG is loaded into the start slot
+        frames = self.fake.find("upload_frame")
+        self.assertEqual(len(frames), 1)
+        self.assertEqual(frames[0][2]["slot"], "start")
+        self.assertTrue(frames[0][1][0].endswith("a.png"), frames[0])
+
+    def test_start_and_end_fill_both_slots(self):
+        code = self._run_batch({
+            "project": "demo",
+            "jobs": [
+                {"type": "image", "name": "a", "prompt": "p"},
+                {"type": "image", "name": "z", "prompt": "p"},
+                {"type": "video", "name": "b", "start": "a", "end": "z", "prompt": "p"},
+            ],
+        })
+        self.assertEqual(code, 0)
+        slots = [c[2]["slot"] for c in self.fake.find("upload_frame")]
+        self.assertEqual(slots, ["start", "end"])
+
+    def test_duration_and_resolution_reach_the_panel(self):
+        code = self._run_batch({
+            "project": "demo",
+            "jobs": [{"type": "video", "name": "b", "prompt": "p",
+                      "duration": 4, "gen_res": "360p"}],
+        })
+        self.assertEqual(code, 0)
+        kw = self.fake.find("select_video_mode")[0][2]
+        self.assertEqual(kw["duration"], 4)
+        self.assertEqual(kw["gen_resolution"], "360p")
 
     def test_all_variants_are_downloaded(self):
         code = self._run_batch({

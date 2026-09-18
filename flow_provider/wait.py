@@ -22,6 +22,21 @@ SEL_ERROR_TEXT = (
 )
 SEL_RETRY_BTN = 'button[aria-label*="eintentar"], button:has-text("refresh")'
 
+# A model can run out of its own usage allowance, separate from credits: Nano
+# Banana Pro has a daily cap. Flow says so within ~5 seconds, and retrying is
+# pointless, so this is detected and raised immediately instead of waiting out
+# the whole timeout. Flow also confirms the attempt was not charged.
+SEL_LIMIT_TEXT = (
+    ':text("Alcanzaste tu l"), '
+    ':text("limite de uso"), '
+    ':text("usage limit"), '
+    ':text("rate limit")'
+)
+
+
+class UsageLimitReached(RuntimeError):
+    """The model hit its own usage cap. Credits were not charged."""
+
 JS_ASSETS = """() => {
   const out = [];
   for (const tile of document.querySelectorAll('flow-tile-container')) {
@@ -50,6 +65,13 @@ async def snapshot_assets() -> list[dict]:
     """Results on screen right now: [{id, kind, ready}, ...]. The id is the src."""
     page = await get_page()
     return await page.evaluate(JS_ASSETS)
+
+
+async def _hit_usage_limit(page) -> bool:
+    try:
+        return await page.locator(SEL_LIMIT_TEXT).count() > 0
+    except Exception:
+        return False
 
 
 async def _count_errors(page) -> int:
@@ -83,6 +105,12 @@ async def wait_for_new_assets(
     for attempt in range(max_retries + 1):
         elapsed = 0
         while elapsed < timeout_ms:
+            if await _hit_usage_limit(page):
+                raise UsageLimitReached(
+                    "This model hit its usage limit. Flow says the attempt was not "
+                    "charged. Wait for it to reset, or switch model (for images, "
+                    "Nano Banana 2 has a much larger allowance than Pro)."
+                )
             current = await snapshot_assets()
             fresh = [a for a in current if a["id"] not in before_ids and a["ready"]]
             # Flow labels some results as video thumbnails even when they are

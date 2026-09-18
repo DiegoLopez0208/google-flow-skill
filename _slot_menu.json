@@ -1,0 +1,152 @@
+[
+ {
+  "tag": "button",
+  "texto": "home",
+  "aria": "Página principal",
+  "type": ""
+ },
+ {
+  "tag": "input",
+  "texto": "",
+  "aria": "Texto editable",
+  "type": "text"
+ },
+ {
+  "tag": "button",
+  "texto": "more_vert",
+  "aria": "Más opciones para el proyecto",
+  "type": ""
+ },
+ {
+  "tag": "button",
+  "texto": "search",
+  "aria": "Buscar",
+  "type": ""
+ },
+ {
+  "tag": "input",
+  "texto": "",
+  "aria": "Buscar",
+  "type": "text"
+ },
+ {
+  "tag": "button",
+  "texto": "filter_list",
+  "aria": "Opciones para filtrar y ordenar",
+  "type": ""
+ },
+ {
+  "tag": "button",
+  "texto": "add",
+  "aria": "Agregar menú de contenido multimedia",
+  "type": ""
+ },
+ {
+  "tag": "button",
+  "texto": "help",
+  "aria": "Ayuda sobre el producto",
+  "type": ""
+ },
+ {
+  "tag": "button",
+  "texto": "settings_2",
+  "aria": "Configuración de la cuadrícula de tarjetas",
+  "type": ""
+ },
+ {
+  "tag": "button",
+  "texto": "more_vert",
+  "aria": "Más opciones",
+  "type": ""
+ },
+ {
+  "tag": "div",
+  "texto": "PRO",
+  "aria": "Detalles de la cuenta",
+  "type": ""
+ },
+ {
+  "tag": "a",
+  "texto": "",
+  "aria": "Cuenta de Google: Diego Lopez  \n(lopezdiegog26@gmail.com), Membresía de Google",
+  "type": ""
+ },
+ {
+  "tag": "mat-list-item",
+  "texto": "dashboard | Todos los elementos multimedia",
+  "aria": "",
+  "type": ""
+ },
+ {
+  "tag": "mat-list-item",
+  "texto": "accessibility_new | Personajes",
+  "aria": "",
+  "type": ""
+ },
+ {
+  "tag": "mat-list-item",
+  "texto": "movie | Escenas",
+  "aria": "",
+  "type": ""
+ },
+ {
+  "tag": "mat-list-item",
+  "texto": "left_panel_close | Contraer",
+  "aria": "",
+  "type": ""
+ },
+ {
+  "tag": "button",
+  "texto": "close",
+  "aria": "Descartar banner de crédito",
+  "type": ""
+ },
+ {
+  "tag": "button",
+  "texto": "Iniciar",
+  "aria": "",
+  "type": ""
+ },
+ {
+  "tag": "button",
+  "texto": "swap_horiz",
+  "aria": "Intercambiar el primer y el último marco",
+  "type": ""
+ },
+ {
+  "tag": "button",
+  "texto": "Finalizar",
+  "aria": "",
+  "type": ""
+ },
+ {
+  "tag": "button",
+  "texto": "Agente",
+  "aria": "",
+  "type": ""
+ },
+ {
+  "tag": "button",
+  "texto": "Video · 360p · 4 s | crop_9_16 | x1",
+  "aria": "Botón de configuración",
+  "type": ""
+ },
+ {
+  "tag": "button",
+  "texto": "arrow_forward",
+  "aria": "Iniciar generación",
+  "type": "submit"
+ },
+ {
+  "tag": "button",
+  "texto": "close",
+  "aria": "Cerrar",
+  "type": "button"
+ },
+ {
+  "tag": "input",
+  "texto": "",
+  "aria": "Buscar activos",
+  "type": "text"
+ }
+]

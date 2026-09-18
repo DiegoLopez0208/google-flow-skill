@@ -1,0 +1,22 @@
+{
+  "project": "firefly_cookie_crumb_pro_v3_2026-09-17",
+  "defaults": { "ratio": "9:16", "image_model": "Nano Banana Pro" },
+  "jobs": [
+    {
+      "type": "image",
+      "name": "01_cookie_crumb_first_frame",
+      "count": 4,
+      "res": "2K",
+      "image": "C:/Users/Diego/Desktop/FireflyStudio_MultiAI/References/Generated/TapeTrap_2026-09-16/01_tape_trap_first_frame_safe.jpg",
+      "prompt": "Edit this photograph. Keep the same real indoor desk setting, the same camera angle and distance, the same daylight, the same photorealistic rendering of the environment, and the same chibi character drawn in exactly the same 2.5D cel-shaded style with the same face, hair, headband, butterfly hair ornament, tailcoat, golden neck scarf, white gloves, mint skirt, black tights and boots.\n\nMake only these changes:\n1. Remove the tape dispenser and the strip of tape.\n2. Remove the black desk mat so she stands directly on the bare wooden desk surface.\n3. Place one real white ceramic coffee mug with a visible handle on the left side of frame, standing on the desk, tall enough that she reaches only about one third of its height.\n4. She now hugs one single golden-brown cookie crumb, as big as her own torso, pressed against her chest with both arms wrapped around it and both hands gripping it.\n5. Her smile becomes a proud, smug closed-mouth smile, eyes wide open looking straight at the camera.\n6. She casts a soft contact shadow and a short cast shadow on the wood.\n\nKeep everything else exactly the same. The environment stays fully photorealistic and is never cel-shaded. No text, no watermark, no human hands, no extra characters."
+    },
+    {
+      "type": "image",
+      "name": "02_cookie_crumb_final_frame",
+      "count": 4,
+      "res": "2K",
+      "image": "C:/Users/Diego/Desktop/FireflyStudio_MultiAI/References/Generated/TapeTrap_2026-09-16/01_tape_trap_first_frame_safe.jpg",
+      "prompt": "Edit this photograph. Keep the same real indoor desk setting, the same camera angle and distance, the same daylight, the same photorealistic rendering of the environment, and the same chibi character drawn in exactly the same 2.5D cel-shaded style with the same face, hair, headband, butterfly hair ornament, tailcoat, golden neck scarf, white gloves, mint skirt, black tights and boots.\n\nMake only these changes:\n1. Remove the tape dispenser and the strip of tape.\n2. Remove the black desk mat so she stands directly on the bare wooden desk surface.\n3. Place one real white ceramic coffee mug with a visible handle on the left side of frame, standing on the desk, tall enough that she reaches only about one third of its height.\n4. Raise both of her arms straight up above her head in furious protest toward the upper-right corner of frame, hands completely empty and open, her body angled to the right while her face stays turned toward the camera.\n5. Change her expression to a furious comedic anime face drawn as flat 2D graphic elements on the same face: eyes open and narrowed into sharp angry arcs with visible violet irises, lowered angry eyebrows, cheeks puffed outward in flat cel-shaded form, small stylized triangular open pout, and two small illustrated blue sweat drops floating beside her head.\n6. She casts a soft contact shadow and a short cast shadow on the wood.\n\nKeep everything else exactly the same. The environment stays fully photorealistic and is never cel-shaded. No text, no watermark, no human hands, no extra characters, nothing held in her hands."
+    }
+  ]
+}

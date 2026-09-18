@@ -3,6 +3,36 @@
 All notable changes to this fork. Dates are when the work was verified against
 the live Flow UI, not when Google shipped a change.
 
+## [2.1.0] - 2026-09-18
+
+### Added
+- **Video sub-modes.** The settings panel has a `flow-toggles[aria-label="Tipo
+  de video"]` row that only appears once Video is selected, which is why an
+  image-mode dump never revealed it: `Fotogramas` (frames) and `Ingredientes`
+  (ingredients).
+- **Frames mode works again**: `--start` / `--end` pin the first and last frame.
+  The slots are labelled "Iniciar" and "Finalizar" in `flow-ingredient-bar` —
+  the original code looked for "Fin", which is why it never found them. The slot
+  opens a "pick a frame image" dialog that only lists assets already in the
+  project, so a local file is uploaded first and then picked.
+- **`--duration`** (4, 6, 8, 10 s) and **`--gen-res`** (360p / 720p). Both change
+  the price: Omni 1.1 Flash costs 12 credits at 8s/720p and 4 at 4s/360p.
+- **The real cost is read from the UI**, not estimated. Flow prints it in
+  `flow-credit-cost-label` ("La generación usará 12 créditos") and it updates
+  with model, duration and count. The CLI quotes it before generating.
+- **Usage-limit detection.** A model can exhaust its own allowance separately
+  from credits (Nano Banana Pro has a daily cap). Flow says so within ~5 seconds
+  and confirms nothing was charged, so `UsageLimitReached` is raised right away
+  instead of burning the full timeout. Failure went from 240s of silence to 31s
+  with an actionable message.
+
+### Fixed
+- `canvas.py` used `Path` without importing it.
+
+### Changed
+- Video only offers 16:9 and 9:16; the other three ratios are image-only, and
+  asking for one now fails with that explanation.
+
 ## [2.0.1] - 2026-09-17
 
 ### Fixed

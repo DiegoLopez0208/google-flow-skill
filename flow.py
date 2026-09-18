@@ -463,14 +463,6 @@ async def _attach_refs(refs: list[str]) -> list[str]:
     return uuids
 
 
-def _no_soportado_fotogramas():
-    raise ValueError(
-        "Frames mode (--start/--end) is not ported to the new Flow UI: the panel "
-        "no longer has the start/end slots. Use --refs to guide the video with "
-        "reference images instead."
-    )
-
-
 async def _gen_image(prompt, ratio, model, count, refs, out_path,
                      resolution="1K", label=None) -> list[str]:
     await flow.select_image_mode(aspect_ratio=ratio, count=count, model=model)
@@ -488,21 +480,42 @@ async def _gen_image(prompt, ratio, model, count, refs, out_path,
 
 
 async def _gen_video(prompt, ratio, model, count, start, end, refs, out_path,
-                     resolution="720p", label=None) -> list[str]:
+                     resolution="720p", label=None, duration=None, gen_res=None) -> list[str]:
+    """Generate a video.
+
+    The sub-mode is picked from what was passed: frames pins the exact first
+    (and optionally last) image, ingredients only guide the look. Frames wins
+    when the keyframe has already been chosen.
+    """
     if start or end:
-        _no_soportado_fotogramas()
-    await flow.select_video_mode(mode="ingredients" if refs else "text",
-                                 model=model, aspect_ratio=ratio, count=count)
-    if refs:
+        mode = "frames"
+    elif refs:
+        mode = "ingredients"
+    else:
+        mode = "text"
+
+    quoted = await flow.select_video_mode(mode=mode, model=model, aspect_ratio=ratio,
+                                          count=count, duration=duration,
+                                          gen_resolution=gen_res)
+    if quoted:
+        print(f"  Flow quotes {quoted} credit(s) for this one")
+
+    if mode == "frames":
+        if start:
+            await flow.upload_frame(start, "start")
+        if end:
+            await flow.upload_frame(end, "end")
+    elif mode == "ingredients":
         await _attach_refs(refs)
+
     before = await flow.snapshot_assets()
-    previos_api = await _known_asset_ids()
+    before_ids = await _known_asset_ids()
     await flow.submit_prompt(prompt)
     fresh = await flow.wait_for_new_assets(before, expected=count,
-                                            is_video=True, timeout_ms=600_000)
+                                           is_video=True, timeout_ms=600_000)
     if label and fresh:
         await _remember_asset(label, fresh[0])
-    saved = await _download_via_api(previos_api, out_path, count, "video")
+    saved = await _download_via_api(before_ids, out_path, count, "video")
     return saved if saved else await _download_via_browser(fresh, out_path, resolution)
 
 
@@ -544,7 +557,8 @@ async def cmd_video(args) -> int:
         await _open_project()
         saved = await _gen_video(args.prompt, args.ratio, args.model, args.count,
                                  args.start, args.end, refs, out_path,
-                                 resolution=args.res, label=name)
+                                 resolution=args.res, label=name,
+                                 duration=args.duration, gen_res=args.gen_res)
         for f in saved:
             print(f"OK video -> {f}")
         return 0
@@ -609,6 +623,7 @@ async def cmd_batch(args) -> int:
                         _resolve_asset(project_dir, job.get("start")),
                         _resolve_asset(project_dir, job.get("end")), refs,
                         out_path, resolution=job.get("res", "720p"), label=name,
+                        duration=job.get("duration"), gen_res=job.get("gen_res"),
                     )
                 else:
                     print(f"  kind desconocido '{jtype}', saltando.")
@@ -695,13 +710,17 @@ def build_parser() -> argparse.ArgumentParser:
     pv.add_argument("--ratio", default="9:16", choices=list(SEL_RATIO))
     pv.add_argument("--model", default="Veo 3.1 - Lite", choices=list(SEL_MODEL_VID))
     pv.add_argument("--count", type=int, default=1, choices=list(SEL_COUNT))
-    pv.add_argument("--start", default=None, help="Start frame (image). Not ported to the new UI.")
-    pv.add_argument("--end", default=None, help="End frame (image). Not ported to the new UI.")
+    pv.add_argument("--start", default=None, help="First frame: the video starts exactly on this image.")
+    pv.add_argument("--end", default=None, help="Last frame: the video interpolates towards this image.")
     pv.add_argument("--refs", default=None,
                     help="Comma-separated ingredients: local files and/or names of "
                          "earlier jobs in the same batch. Turns on ingredients mode.")
     pv.add_argument("--res", default="720p", choices=["720p", "1080p", "4K"],
                     help="Download resolution.")
+    pv.add_argument("--duration", type=int, default=None, choices=[4, 6, 8, 10],
+                    help="Clip length in seconds.")
+    pv.add_argument("--gen-res", dest="gen_res", default=None, choices=["360p", "720p"],
+                    help="Generation resolution. 360p is cheaper.")
     pv.add_argument("--name", default=None)
     pv.add_argument("--out", default=str(DEFAULT_OUT))
 

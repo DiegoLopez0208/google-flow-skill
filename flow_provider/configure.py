@@ -24,6 +24,18 @@ SEL_MODEL_BTN = 'button[aria-label*="familia de modelos"]'
 MODE_IMAGE = ("image", "Imagen")
 MODE_VIDEO = ("videocam", "Video")
 
+# Video sub-mode, in flow-toggles[aria-label="Tipo de video"]. Only shows up once
+# Video is selected, which is why an image-mode dump never reveals it.
+SUBMODE_FRAMES = ("crop_free", "Fotogramas")
+SUBMODE_INGREDIENTS = ("chrome_extension", "Ingredientes")
+
+# Clip length and generation resolution, video only.
+SEL_DURATION = {s: (f"{s} s", f"{s} s") for s in (4, 6, 8, 10)}
+SEL_GEN_RES = {"360p": ("360p", "360p"), "720p": ("720p", "720p")}
+
+# Video offers only these two ratios; the other three are image-only.
+VIDEO_RATIOS = ("16:9", "9:16")
+
 SEL_RATIO = {
     "16:9": ("crop_16_9", "16:9"),
     "4:3": ("crop_landscape", "4:3"),
@@ -157,23 +169,71 @@ async def select_video_mode(
     model: str = "Veo 3.1 - Lite",
     aspect_ratio: str = "9:16",
     count: int = 1,
+    duration: int | None = None,
+    gen_resolution: str | None = None,
 ) -> None:
     """Put the panel in video mode.
 
-    'mode' is kept for signature compatibility. The new UI has no frames or
-    ingredients sub-tabs inside this panel: references are attached from the
-    prompt bar's add menu (see canvas.py).
+    'mode' picks the sub-mode:
+      - "text"        plain text-to-video, no reference
+      - "frames"      first/last frame slots appear in the prompt bar
+      - "ingredients" references guide the video without pinning composition
+
+    'duration' is 4, 6, 8 or 10 seconds; 'gen_resolution' is "360p" or "720p".
+    Both are left untouched when None, keeping whatever Flow had selected.
     """
     page = await get_page()
     if mode not in ("text", "frames", "ingredients"):
         raise ValueError(f"mode '{mode}' is not valid. Options: text, frames, ingredients")
     _validate(model, SEL_MODEL_VID, "video model")
+    if aspect_ratio not in VIDEO_RATIOS:
+        raise ValueError(
+            f"aspect_ratio '{aspect_ratio}' is not available for video. "
+            f"Flow only offers {list(VIDEO_RATIOS)} here."
+        )
     ratio = _validate(aspect_ratio, SEL_RATIO, "aspect_ratio")
     cnt = _validate(count, SEL_COUNT, "count")
 
     await _open_panel(page)
     await _click_option(page, MODE_VIDEO, "video mode")
+    await page.wait_for_timeout(600)
+
+    if mode == "frames":
+        await _click_option(page, SUBMODE_FRAMES, "frames sub-mode")
+    elif mode == "ingredients":
+        await _click_option(page, SUBMODE_INGREDIENTS, "ingredients sub-mode")
+
     await _select_model(page, model)
     await _click_option(page, ratio, "aspect ratio")
+
+    if duration is not None:
+        await _click_option(page, _validate(duration, SEL_DURATION, "duration"), "duration")
+    if gen_resolution is not None:
+        await _click_option(page, _validate(gen_resolution, SEL_GEN_RES, "gen_resolution"),
+                            "generation resolution")
+
     await _click_option(page, cnt, "count")
+    # Read the price Flow itself quotes, before closing the panel.
+    cost = await read_planned_cost(page)
     await _close_panel(page)
+    return cost
+
+
+SEL_COST_LABEL = "flow-credit-cost-label"
+
+
+async def read_planned_cost(page) -> int | None:
+    """Credits Flow says the next generation will use, straight from the panel.
+
+    Beats guessing: the label updates with model, duration and count.
+    """
+    import re
+    try:
+        label = page.locator(SEL_COST_LABEL)
+        if await label.count() == 0:
+            return None
+        text = await label.first.inner_text()
+        m = re.search(r"([0-9]+)", text)
+        return int(m.group(1)) if m else None
+    except Exception:
+        return None

@@ -1,0 +1,830 @@
+[
+ {
+  "tag": "html",
+  "role": "",
+  "texto": "Skip to main content Comienza a crear o suelta con",
+  "aria": ""
+ },
+ {
+  "tag": "a",
+  "role": "",
+  "texto": "Skip to main content",
+  "aria": ""
+ },
+ {
+  "tag": "aisandbox-root",
+  "role": "",
+  "texto": "Comienza a crear o suelta contenido multimedia hom",
+  "aria": ""
+ },
+ {
+  "tag": "div",
+  "role": "",
+  "texto": "Comienza a crear o suelta contenido multimedia",
+  "aria": ""
+ },
+ {
+  "tag": "span",
+  "role": "",
+  "texto": "Comienza a crear o suelta contenido multimedia",
+  "aria": ""
+ },
+ {
+  "tag": "div",
+  "role": "",
+  "texto": "home more_vert search filter_list add help setting",
+  "aria": ""
+ },
+ {
+  "tag": "flow-tile-view-header",
+  "role": "",
+  "texto": "home more_vert search filter_list add help setting",
+  "aria": ""
+ },
+ {
+  "tag": "header",
+  "role": "",
+  "texto": "home more_vert search filter_list add help setting",
+  "aria": ""
+ },
+ {
+  "tag": "div",
+  "role": "",
+  "texto": "home more_vert",
+  "aria": ""
+ },
+ {
+  "tag": "flow-navigation-header",
+  "role": "",
+  "texto": "home",
+  "aria": ""
+ },
+ {
+  "tag": "nav",
+  "role": "",
+  "texto": "home",
+  "aria": ""
+ },
+ {
+  "tag": "mat-icon",
+  "role": "img",
+  "texto": "home",
+  "aria": ""
+ },
+ {
+  "tag": "mat-icon",
+  "role": "img",
+  "texto": "more_vert",
+  "aria": ""
+ },
+ {
+  "tag": "div",
+  "role": "",
+  "texto": "search filter_list",
+  "aria": ""
+ },
+ {
+  "tag": "flow-search-bar",
+  "role": "",
+  "texto": "search filter_list",
+  "aria": ""
+ },
+ {
+  "tag": "div",
+  "role": "",
+  "texto": "search",
+  "aria": ""
+ },
+ {
+  "tag": "mat-icon",
+  "role": "img",
+  "texto": "search",
+  "aria": ""
+ },
+ {
+  "tag": "mat-icon",
+  "role": "img",
+  "texto": "filter_list",
+  "aria": ""
+ },
+ {
+  "tag": "div",
+  "role": "",
+  "texto": "add help settings_2 more_vert PRO",
+  "aria": ""
+ },
+ {
+  "tag": "div",
+  "role": "",
+  "texto": "add help settings_2 more_vert",
+  "aria": ""
+ },
+ {
+  "tag": "mat-icon",
+  "role": "img",
+  "texto": "add",
+  "aria": ""
+ },
+ {
+  "tag": "mat-icon",
+  "role": "img",
+  "texto": "help",
+  "aria": ""
+ },
+ {
+  "tag": "mat-icon",
+  "role": "img",
+  "texto": "settings_2",
+  "aria": ""
+ },
+ {
+  "tag": "flow-more-options-menu",
+  "role": "",
+  "texto": "more_vert",
+  "aria": ""
+ },
+ {
+  "tag": "flow-header-user-icon",
+  "role": "",
+  "texto": "PRO",
+  "aria": ""
+ },
+ {
+  "tag": "div",
+  "role": "button",
+  "texto": "PRO",
+  "aria": "Detalles de la cuenta"
+ },
+ {
+  "tag": "flow-user-tier-chip",
+  "role": "",
+  "texto": "PRO",
+  "aria": ""
+ },
+ {
+  "tag": "span",
+  "role": "",
+  "texto": "PRO",
+  "aria": "PRO tier"
+ },
+ {
+  "tag": "flow-project-sidenav-container",
+  "role": "",
+  "texto": "dashboard Todos los elementos multimedia accessibi",
+  "aria": ""
+ },
+ {
+  "tag": "mat-sidenav",
+  "role": "",
+  "texto": "dashboard Todos los elementos multimedia accessibi",
+  "aria": ""
+ },
+ {
+  "tag": "div",
+  "role": "",
+  "texto": "dashboard Todos los elementos multimedia accessibi",
+  "aria": ""
+ },
+ {
+  "tag": "flow-project-nav-list",
+  "role": "",
+  "texto": "dashboard Todos los elementos multimedia accessibi",
+  "aria": ""
+ },
+ {
+  "tag": "mat-nav-list",
+  "role": "navigation",
+  "texto": "dashboard Todos los elementos multimedia accessibi",
+  "aria": "Navegación de proyectos"
+ },
+ {
+  "tag": "mat-icon",
+  "role": "img",
+  "texto": "dashboard",
+  "aria": ""
+ },
+ {
+  "tag": "span",
+  "role": "",
+  "texto": "Todos los elementos multimedia",
+  "aria": ""
+ },
+ {
+  "tag": "mat-icon",
+  "role": "img",
+  "texto": "accessibility_new",
+  "aria": ""
+ },
+ {
+  "tag": "span",
+  "role": "",
+  "texto": "Personajes",
+  "aria": ""
+ },
+ {
+  "tag": "mat-icon",
+  "role": "img",
+  "texto": "movie",
+  "aria": ""
+ },
+ {
+  "tag": "span",
+  "role": "",
+  "texto": "Escenas",
+  "aria": ""
+ },
+ {
+  "tag": "mat-icon",
+  "role": "img",
+  "texto": "apps_spark_2",
+  "aria": ""
+ },
+ {
+  "tag": "span",
+  "role": "",
+  "texto": "Herramientas",
+  "aria": ""
+ },
+ {
+  "tag": "div",
+  "role": "",
+  "texto": "delete Papelera left_panel_close Contraer",
+  "aria": ""
+ },
+ {
+  "tag": "mat-icon",
+  "role": "img",
+  "texto": "delete",
+  "aria": ""
+ },
+ {
+  "tag": "span",
+  "role": "",
+  "texto": "Papelera",
+  "aria": ""
+ },
+ {
+  "tag": "mat-icon",
+  "role": "img",
+  "texto": "left_panel_close",
+  "aria": ""
+ },
+ {
+  "tag": "span",
+  "role": "",
+  "texto": "Contraer",
+  "aria": ""
+ },
+ {
+  "tag": "mat-sidenav-content",
+  "role": "",
+  "texto": "info Te quedan pocos créditos de Google Flow. Tus ",
+  "aria": ""
+ },
+ {
+  "tag": "div",
+  "role": "",
+  "texto": "info Te quedan pocos créditos de Google Flow. Tus ",
+  "aria": ""
+ },
+ {
+  "tag": "flow-credit-banner",
+  "role": "",
+  "texto": "info Te quedan pocos créditos de Google Flow. Tus ",
+  "aria": ""
+ },
+ {
+  "tag": "mat-icon",
+  "role": "img",
+  "texto": "info",
+  "aria": ""
+ },
+ {
+  "tag": "span",
+  "role": "",
+  "texto": "Te quedan pocos créditos de Google Flow. Tus crédi",
+  "aria": ""
+ },
+ {
+  "tag": "div",
+  "role": "",
+  "texto": "open_in_new Agregar créditos de IA close",
+  "aria": ""
+ },
+ {
+  "tag": "mat-icon",
+  "role": "img",
+  "texto": "open_in_new",
+  "aria": ""
+ },
+ {
+  "tag": "span",
+  "role": "",
+  "texto": "Agregar créditos de IA",
+  "aria": ""
+ },
+ {
+  "tag": "mat-icon",
+  "role": "img",
+  "texto": "close",
+  "aria": ""
+ },
+ {
+  "tag": "flow-prompt-box",
+  "role": "",
+  "texto": "Iniciar swap_horiz Finalizar ¿Qué quieres crear?  ",
+  "aria": ""
+ },
+ {
+  "tag": "flow-prompt-box-instruction-card-wrapper",
+  "role": "",
+  "texto": "Iniciar swap_horiz Finalizar ¿Qué quieres crear?  ",
+  "aria": ""
+ },
+ {
+  "tag": "div",
+  "role": "",
+  "texto": "Iniciar swap_horiz Finalizar ¿Qué quieres crear?  ",
+  "aria": ""
+ },
+ {
+  "tag": "flow-base-prompt-box",
+  "role": "",
+  "texto": "Iniciar swap_horiz Finalizar ¿Qué quieres crear?  ",
+  "aria": ""
+ },
+ {
+  "tag": "div",
+  "role": "",
+  "texto": "Iniciar swap_horiz Finalizar",
+  "aria": ""
+ },
+ {
+  "tag": "flow-ingredient-bar",
+  "role": "",
+  "texto": "Iniciar swap_horiz Finalizar",
+  "aria": ""
+ },
+ {
+  "tag": "div",
+  "role": "",
+  "texto": "Iniciar",
+  "aria": ""
+ },
+ {
+  "tag": "button",
+  "role": "",
+  "texto": "Iniciar",
+  "aria": ""
+ },
+ {
+  "tag": "mat-icon",
+  "role": "img",
+  "texto": "swap_horiz",
+  "aria": ""
+ },
+ {
+  "tag": "div",
+  "role": "",
+  "texto": "Finalizar",
+  "aria": ""
+ },
+ {
+  "tag": "button",
+  "role": "",
+  "texto": "Finalizar",
+  "aria": ""
+ },
+ {
+  "tag": "flow-rich-text-editor",
+  "role": "",
+  "texto": "¿Qué quieres crear?",
+  "aria": ""
+ },
+ {
+  "tag": "span",
+  "role": "",
+  "texto": "¿Qué quieres crear?",
+  "aria": ""
+ },
+ {
+  "tag": "flow-agent-mode-toggle-chip",
+  "role": "",
+  "texto": "Agente",
+  "aria": ""
+ },
+ {
+  "tag": "button",
+  "role": "",
+  "texto": "Agente",
+  "aria": ""
+ },
+ {
+  "tag": "span",
+  "role": "",
+  "texto": "Agente",
+  "aria": ""
+ },
+ {
+  "tag": "span",
+  "role": "",
+  "texto": "Video · 720p · 8 s crop_9_16 x1",
+  "aria": ""
+ },
+ {
+  "tag": "mat-icon",
+  "role": "img",
+  "texto": "crop_9_16",
+  "aria": ""
+ },
+ {
+  "tag": "flow-generate-icon-button",
+  "role": "",
+  "texto": "arrow_forward",
+  "aria": ""
+ },
+ {
+  "tag": "mat-icon",
+  "role": "img",
+  "texto": "arrow_forward",
+  "aria": ""
+ },
+ {
+  "tag": "flow-footer-disclaimer",
+  "role": "",
+  "texto": "Google Flow puede cometer errores, así que verific",
+  "aria": ""
+ },
+ {
+  "tag": "p",
+  "role": "",
+  "texto": "Google Flow puede cometer errores, así que verific",
+  "aria": ""
+ },
+ {
+  "tag": "div",
+  "role": "",
+  "texto": "image Imagen videocam Video crop_free Fotogramas c",
+  "aria": ""
+ },
+ {
+  "tag": "flow-prompt-box-settings",
+  "role": "",
+  "texto": "image Imagen videocam Video crop_free Fotogramas c",
+  "aria": ""
+ },
+ {
+  "tag": "flow-toggles",
+  "role": "",
+  "texto": "image Imagen videocam Video",
+  "aria": "Modo"
+ },
+ {
+  "tag": "mat-button-toggle-group",
+  "role": "radiogroup",
+  "texto": "image Imagen videocam Video",
+  "aria": ""
+ },
+ {
+  "tag": "button",
+  "role": "radio",
+  "texto": "image Imagen",
+  "aria": ""
+ },
+ {
+  "tag": "span",
+  "role": "",
+  "texto": "image Imagen",
+  "aria": ""
+ },
+ {
+  "tag": "mat-icon",
+  "role": "img",
+  "texto": "image",
+  "aria": ""
+ },
+ {
+  "tag": "span",
+  "role": "",
+  "texto": "Imagen",
+  "aria": ""
+ },
+ {
+  "tag": "button",
+  "role": "radio",
+  "texto": "videocam Video",
+  "aria": ""
+ },
+ {
+  "tag": "span",
+  "role": "",
+  "texto": "videocam Video",
+  "aria": ""
+ },
+ {
+  "tag": "mat-icon",
+  "role": "img",
+  "texto": "videocam",
+  "aria": ""
+ },
+ {
+  "tag": "span",
+  "role": "",
+  "texto": "Video",
+  "aria": ""
+ },
+ {
+  "tag": "flow-toggles",
+  "role": "",
+  "texto": "crop_free Fotogramas chrome_extension Ingredientes",
+  "aria": "Tipo de video"
+ },
+ {
+  "tag": "mat-button-toggle-group",
+  "role": "radiogroup",
+  "texto": "crop_free Fotogramas chrome_extension Ingredientes",
+  "aria": ""
+ },
+ {
+  "tag": "button",
+  "role": "radio",
+  "texto": "crop_free Fotogramas",
+  "aria": ""
+ },
+ {
+  "tag": "span",
+  "role": "",
+  "texto": "crop_free Fotogramas",
+  "aria": ""
+ },
+ {
+  "tag": "mat-icon",
+  "role": "img",
+  "texto": "crop_free",
+  "aria": ""
+ },
+ {
+  "tag": "span",
+  "role": "",
+  "texto": "Fotogramas",
+  "aria": ""
+ },
+ {
+  "tag": "button",
+  "role": "radio",
+  "texto": "chrome_extension Ingredientes",
+  "aria": ""
+ },
+ {
+  "tag": "span",
+  "role": "",
+  "texto": "chrome_extension Ingredientes",
+  "aria": ""
+ },
+ {
+  "tag": "mat-icon",
+  "role": "img",
+  "texto": "chrome_extension",
+  "aria": ""
+ },
+ {
+  "tag": "span",
+  "role": "",
+  "texto": "Ingredientes",
+  "aria": ""
+ },
+ {
+  "tag": "flow-toggles",
+  "role": "",
+  "texto": "crop_16_9 16:9 crop_9_16 9:16",
+  "aria": "Relación de aspecto"
+ },
+ {
+  "tag": "mat-button-toggle-group",
+  "role": "radiogroup",
+  "texto": "crop_16_9 16:9 crop_9_16 9:16",
+  "aria": ""
+ },
+ {
+  "tag": "button",
+  "role": "radio",
+  "texto": "crop_16_9 16:9",
+  "aria": ""
+ },
+ {
+  "tag": "span",
+  "role": "",
+  "texto": "crop_16_9 16:9",
+  "aria": ""
+ },
+ {
+  "tag": "mat-icon",
+  "role": "img",
+  "texto": "crop_16_9",
+  "aria": ""
+ },
+ {
+  "tag": "span",
+  "role": "",
+  "texto": "16:9",
+  "aria": ""
+ },
+ {
+  "tag": "button",
+  "role": "radio",
+  "texto": "crop_9_16 9:16",
+  "aria": ""
+ },
+ {
+  "tag": "span",
+  "role": "",
+  "texto": "crop_9_16 9:16",
+  "aria": ""
+ },
+ {
+  "tag": "span",
+  "role": "",
+  "texto": "9:16",
+  "aria": ""
+ },
+ {
+  "tag": "span",
+  "role": "",
+  "texto": "Omni 1.1 Flash arrow_drop_down",
+  "aria": ""
+ },
+ {
+  "tag": "mat-icon",
+  "role": "img",
+  "texto": "arrow_drop_down",
+  "aria": ""
+ },
+ {
+  "tag": "flow-toggles",
+  "role": "",
+  "texto": "360p info 720p",
+  "aria": "Resolución de video"
+ },
+ {
+  "tag": "mat-button-toggle-group",
+  "role": "radiogroup",
+  "texto": "360p info 720p",
+  "aria": ""
+ },
+ {
+  "tag": "button",
+  "role": "radio",
+  "texto": "360p info",
+  "aria": ""
+ },
+ {
+  "tag": "span",
+  "role": "",
+  "texto": "360p info",
+  "aria": ""
+ },
+ {
+  "tag": "span",
+  "role": "",
+  "texto": "360p",
+  "aria": ""
+ },
+ {
+  "tag": "button",
+  "role": "radio",
+  "texto": "720p",
+  "aria": ""
+ },
+ {
+  "tag": "span",
+  "role": "",
+  "texto": "720p",
+  "aria": ""
+ },
+ {
+  "tag": "flow-toggles",
+  "role": "",
+  "texto": "4 s 6 s 8 s 10 s",
+  "aria": "Duración del video"
+ },
+ {
+  "tag": "button",
+  "role": "radio",
+  "texto": "4 s",
+  "aria": ""
+ },
+ {
+  "tag": "span",
+  "role": "",
+  "texto": "4 s",
+  "aria": ""
+ },
+ {
+  "tag": "button",
+  "role": "radio",
+  "texto": "6 s",
+  "aria": ""
+ },
+ {
+  "tag": "span",
+  "role": "",
+  "texto": "6 s",
+  "aria": ""
+ },
+ {
+  "tag": "button",
+  "role": "radio",
+  "texto": "8 s",
+  "aria": ""
+ },
+ {
+  "tag": "span",
+  "role": "",
+  "texto": "8 s",
+  "aria": ""
+ },
+ {
+  "tag": "button",
+  "role": "radio",
+  "texto": "10 s",
+  "aria": ""
+ },
+ {
+  "tag": "span",
+  "role": "",
+  "texto": "10 s",
+  "aria": ""
+ },
+ {
+  "tag": "flow-toggles",
+  "role": "",
+  "texto": "x1 x2 x3 x4",
+  "aria": "Cantidad de resultados"
+ },
+ {
+  "tag": "button",
+  "role": "radio",
+  "texto": "x1",
+  "aria": ""
+ },
+ {
+  "tag": "span",
+  "role": "",
+  "texto": "x1",
+  "aria": ""
+ },
+ {
+  "tag": "button",
+  "role": "radio",
+  "texto": "x2",
+  "aria": ""
+ },
+ {
+  "tag": "span",
+  "role": "",
+  "texto": "x2",
+  "aria": ""
+ },
+ {
+  "tag": "button",
+  "role": "radio",
+  "texto": "x3",
+  "aria": ""
+ },
+ {
+  "tag": "span",
+  "role": "",
+  "texto": "x3",
+  "aria": ""
+ },
+ {
+  "tag": "button",
+  "role": "radio",
+  "texto": "x4",
+  "aria": ""
+ },
+ {
+  "tag": "span",
+  "role": "",
+  "texto": "x4",
+  "aria": ""
+ },
+ {
+  "tag": "flow-credit-cost-label",
+  "role": "",
+  "texto": "La generación usará 12 créditos",
+  "aria": ""
+ },
+ {
+  "tag": "span",
+  "role": "",
+  "texto": "La generación usará 12 créditos",
+  "aria": ""
+ },
+ {
+  "tag": "a",
+  "role": "",
+  "texto": "12 créditos",
+  "aria": ""
+ }
+]

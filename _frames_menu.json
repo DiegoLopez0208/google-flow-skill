@@ -1,0 +1,110 @@
+[
+ {
+  "texto": "home",
+  "aria": "Página principal"
+ },
+ {
+  "texto": "more_vert",
+  "aria": "Más opciones para el proyecto"
+ },
+ {
+  "texto": "search",
+  "aria": "Buscar"
+ },
+ {
+  "texto": "filter_list",
+  "aria": "Opciones para filtrar y ordenar"
+ },
+ {
+  "texto": "add",
+  "aria": "Agregar menú de contenido multimedia"
+ },
+ {
+  "texto": "help",
+  "aria": "Ayuda sobre el producto"
+ },
+ {
+  "texto": "settings_2",
+  "aria": "Configuración de la cuadrícula de tarjetas"
+ },
+ {
+  "texto": "more_vert",
+  "aria": "Más opciones"
+ },
+ {
+  "texto": "PRO",
+  "aria": "Detalles de la cuenta"
+ },
+ {
+  "texto": "",
+  "aria": "Cuenta de Google: Diego Lopez  \n(lopezdiegog26@gmail.com), Membresía de Google"
+ },
+ {
+  "texto": "dashboard | Todos los elementos multimedia",
+  "aria": ""
+ },
+ {
+  "texto": "accessibility_new | Personajes",
+  "aria": ""
+ },
+ {
+  "texto": "movie | Escenas",
+  "aria": ""
+ },
+ {
+  "texto": "left_panel_close | Contraer",
+  "aria": ""
+ },
+ {
+  "texto": "close",
+  "aria": "Descartar banner de crédito"
+ },
+ {
+  "texto": "close",
+  "aria": "Agregar ingredientes al cuadro de instrucción"
+ },
+ {
+  "texto": "Agente",
+  "aria": ""
+ },
+ {
+  "texto": "Video · 720p · 8 s | crop_9_16 | x1",
+  "aria": "Botón de configuración"
+ },
+ {
+  "texto": "arrow_forward",
+  "aria": "Iniciar generación"
+ },
+ {
+  "texto": "dashboard | Todos",
+  "aria": ""
+ },
+ {
+  "texto": "image | Imágenes",
+  "aria": ""
+ },
+ {
+  "texto": "videocam | Videos",
+  "aria": ""
+ },
+ {
+  "texto": "voice_selection | Voces",
+  "aria": ""
+ },
+ {
+  "texto": "accessibility_new | Caracteres",
+  "aria": ""
+ },
+ {
+  "texto": "face | Avatares",
+  "aria": ""
+ },
+ {
+  "texto": "drive_folder_upload | Cargas",
+  "aria": ""
+ },
+ {
+  "texto": "upload | Cargar contenido multimedia",
+  "aria": ""
+ }
+]

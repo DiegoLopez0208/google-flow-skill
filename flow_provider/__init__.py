@@ -37,17 +37,25 @@ from .project import (
     navigate_to_project,
 )
 from .configure import (
+    read_planned_cost,
     select_image_mode,
     select_video_mode,
 )
 from .canvas import (
+    upload_frame,
     upload_media,
     upload_standalone_image,
     get_canvas_count,
     capture_newest_asset_name,
 )
 from .prompt import submit_prompt
-from .wait import snapshot_assets, wait_for_new_assets, wait_for_image, wait_for_video
+from .wait import (
+    UsageLimitReached,
+    snapshot_assets,
+    wait_for_new_assets,
+    wait_for_image,
+    wait_for_video,
+)
 from .download import (
     download_asset,
     download_assets,
@@ -60,10 +68,10 @@ __all__ = [
     "read_credits", "low_credits_notice", "estimate_cost", "ESTIMATED_COST",
     "startup", "shutdown", "get_page", "get_lock", "browser_alive", "seen_asset_ids",
     "create_project", "navigate_to_project",
-    "select_image_mode", "select_video_mode",
-    "upload_media", "upload_standalone_image",
+    "select_image_mode", "select_video_mode", "read_planned_cost",
+    "upload_media", "upload_standalone_image", "upload_frame",
     "get_canvas_count", "capture_newest_asset_name",
     "submit_prompt",
-    "snapshot_assets", "wait_for_new_assets", "wait_for_image", "wait_for_video",
+    "snapshot_assets", "wait_for_new_assets", "UsageLimitReached", "wait_for_image", "wait_for_video",
     "download_asset", "download_assets", "add_asset_to_prompt", "delete_asset",
 ]
