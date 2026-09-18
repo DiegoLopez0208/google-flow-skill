@@ -40,3 +40,6 @@ _cred*
 # Guiones de trabajo propios, no parte de la skill
 guion_*.json
 cookie_crumb*.json
+
+# Grabaciones y material de demo
+outputs/

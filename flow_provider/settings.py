@@ -26,3 +26,9 @@ FLOW_CHROME_PROFILE = os.getenv(
 
 # Legacy mode (unused): session via a storage_state JSON file.
 FLOW_SESSION_FILE = os.getenv("FLOW_SESSION_FILE", "")
+
+# Screen-record the browser. Playwright captures only the viewport, never the
+# rest of the desktop, which makes it safe to share -- except that Flow's header
+# shows the signed-in account, so crop or blur that corner before publishing.
+FLOW_RECORD_DIR = os.getenv("FLOW_RECORD_DIR", "")
+FLOW_RECORD_SIZE = os.getenv("FLOW_RECORD_SIZE", "1280x900")

@@ -67,6 +67,19 @@ python flow.py clean demo_flow   # delete one project's output when you're done
 python flow.py logout --yes      # delete the saved Google session
 ```
 
+Record the browser while it works, for a demo or to debug a selector:
+
+```powershell
+$env:FLOW_RECORD_DIR="outputs/recording"   # optional: FLOW_RECORD_SIZE=1280x900
+python flow.py batch examples/example_script.json
+```
+
+Playwright captures **only the browser viewport**, never the rest of your
+desktop. It writes one `.webm` per tab, so the guard tab leaves a tiny useless
+one — the biggest file is the real session, and the CLI prints which it is. Note
+that Flow's header shows the signed-in account, so crop that corner before
+publishing a recording.
+
 CLI wiring tests (they never touch the browser or your account):
 
 ```powershell

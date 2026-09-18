@@ -3,6 +3,15 @@
 All notable changes to this fork. Dates are when the work was verified against
 the live Flow UI, not when Google shipped a change.
 
+## [2.2.0] - 2026-09-18
+
+### Added
+- **Browser recording** via `FLOW_RECORD_DIR` (and optional `FLOW_RECORD_SIZE`).
+  Uses Playwright's own video capture, so it records the viewport only and never
+  the rest of the desktop. One `.webm` per tab: the guard tab leaves a tiny
+  useless file, so the CLI reports the largest one. Flow's header shows the
+  signed-in account, which is worth cropping before sharing a clip.
+
 ## [2.1.0] - 2026-09-18
 
 ### Added

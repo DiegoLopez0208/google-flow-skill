@@ -89,6 +89,24 @@ async def startup() -> None:
         raise
 
 
+def _recording_options() -> dict:
+    """Extra context options when recording is on, else nothing.
+
+    Playwright writes one .webm per page and only finalises it on
+    context.close(), so shutdown() has to run for the file to be usable.
+    """
+    if not settings.FLOW_RECORD_DIR:
+        return {}
+    out = Path(settings.FLOW_RECORD_DIR)
+    out.mkdir(parents=True, exist_ok=True)
+    try:
+        w, h = (int(x) for x in settings.FLOW_RECORD_SIZE.lower().split("x"))
+    except Exception:
+        w, h = 1280, 900
+    print(f"  recording the browser into {out}")
+    return {"record_video_dir": str(out), "record_video_size": {"width": w, "height": h}}
+
+
 async def _launch() -> None:
     global _context, _page, _guard_page
 
@@ -105,6 +123,7 @@ async def _launch() -> None:
             storage_state=session_file,
             accept_downloads=True,
             viewport={"width": 1280, "height": 900},
+            **_recording_options(),
         )
     else:
         # Clear stale Chrome lock files before starting.
@@ -131,6 +150,7 @@ async def _launch() -> None:
             args=_CHROME_ARGS,
             accept_downloads=True,
             viewport={"width": 1280, "height": 900},
+            **_recording_options(),
         )
 
     _page = _context.pages[0] if _context.pages else await _context.new_page()
@@ -170,6 +190,14 @@ async def shutdown() -> None:
                 await _playwright.stop()
         finally:
             _playwright = _context = _page = _guard_page = None
+        if settings.FLOW_RECORD_DIR:
+            out = Path(settings.FLOW_RECORD_DIR)
+            # One .webm per page, so the guard tab leaves a tiny useless one.
+            # The biggest file is the real session.
+            clips = sorted(out.glob("*.webm"), key=lambda f: f.stat().st_size)
+            if clips:
+                mb = clips[-1].stat().st_size / 1048576
+                print(f"  recording saved: {clips[-1]} ({mb:.1f} MB)")
 
 
 async def get_page() -> Page:
