@@ -36,3 +36,7 @@ _rpc*
 _api_dl*
 _test_api*
 _cred*
+
+# Guiones de trabajo propios, no parte de la skill
+guion_*.json
+cookie_crumb*.json
