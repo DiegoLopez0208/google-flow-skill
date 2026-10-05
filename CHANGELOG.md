@@ -1,7 +1,31 @@
 # Changelog
 
-All notable changes to this fork. Dates are when the work was verified against
-the live Flow UI, not when Google shipped a change.
+All notable changes. Browser verification dates belong to the corresponding
+historical entries; packaging releases do not imply a new live generation test.
+
+## [2.3.0] - 2026-10-05
+
+### Added
+- Python wheel and source distribution, a `google-flow` executable and
+  `python -m google_flow_skill` entry point.
+- `--version`, `skill-path` and `examples` commands; the complete manual and
+  sample scripts are bundled in the wheel.
+- A Claude Code marketplace manifest and matching 2.3.0 plugin version.
+- Writable package state in `~/.google-flow-skill`, configurable with `FLOW_HOME`.
+  Source/plugin checkouts retain their existing portable session location.
+- Release automation, installed-package smoke checks and an opt-in PyPI
+  publishing workflow (requires a PyPI account and Trusted Publisher setup).
+
+### Fixed
+- Agent onboarding and README now describe the frames mode restored in 2.1.0.
+- Standalone skills installation bootstraps the CLI instead of assuming that
+  `flow.py` was copied alongside the manual.
+- Debug screenshots and UI dumps are no longer tracked in the source tree.
+  Existing local originals are preserved.
+
+### Validation scope
+- Package installation and CLI tests do not open Chrome or spend Flow credits.
+- Existing uncommitted browser/prompt changes are outside this release.
 
 ## [2.2.0] - 2026-09-18
 

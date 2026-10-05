@@ -65,7 +65,7 @@ if hasattr(sys.stderr, "reconfigure"):
     sys.stderr.reconfigure(encoding="utf-8")
 
 BASE_DIR = Path(__file__).parent.resolve()
-DEFAULT_OUT = BASE_DIR / "outputs"
+DEFAULT_OUT = settings.DATA_DIR / "outputs"
 FLOW_URL = "https://flow.google.com"
 
 
@@ -217,6 +217,34 @@ async def cmd_status(_args) -> int:
         return 0
     print("SIN SESION. Corre primero: python flow.py login")
     return 1
+
+
+async def cmd_skill_path(_args) -> int:
+    """Locate the complete manual in a checkout or an installed wheel."""
+    manual = BASE_DIR / "skills" / "google-flow" / "SKILL.md"
+    if not manual.is_file():
+        from importlib.resources import files
+        manual = files("google_flow_skill").joinpath("data", "SKILL.md")
+    print(manual)
+    return 0
+
+
+async def cmd_examples(args) -> int:
+    """Copy bundled examples without replacing the user's existing scripts."""
+    from importlib.resources import files
+    target = Path(args.out)
+    target.mkdir(parents=True, exist_ok=True)
+    for name in ("example_script.json", "character_refs_script.json"):
+        destination = target / name
+        if destination.exists():
+            print(f"Kept existing file: {destination}")
+            continue
+        source = BASE_DIR / "examples" / name
+        data = (source.read_bytes() if source.is_file() else
+                files("google_flow_skill").joinpath("data", name).read_bytes())
+        destination.write_bytes(data)
+        print(destination)
+    return 0
 
 
 # ---------------------------------------------------------------------------
@@ -696,11 +724,16 @@ async def cmd_clean(args) -> int:
 # ---------------------------------------------------------------------------
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description="CLI Google Flow (Playwright).")
+    from google_flow_skill import __version__
+    p.add_argument("--version", action="version", version=f"google-flow {__version__}")
     sub = p.add_subparsers(dest="cmd", required=True)
 
     sub.add_parser("login", help="Sign in to Google Flow (once).")
     sub.add_parser("status", help="Check whether a session is saved.")
     sub.add_parser("credits", help="Show the credits left on the account.")
+    sub.add_parser("skill-path", help="Print the path to the bundled agent manual.")
+    examples = sub.add_parser("examples", help="Copy bundled JSON scripts without generating.")
+    examples.add_argument("--out", default="flow-examples", help="Destination directory.")
 
     pl = sub.add_parser("logout", help="Delete the saved session.")
     pl.add_argument("--yes", action="store_true",
@@ -757,6 +790,8 @@ HANDLERS = {
     "login": cmd_login,
     "status": cmd_status,
     "credits": cmd_credits,
+    "skill-path": cmd_skill_path,
+    "examples": cmd_examples,
     "logout": cmd_logout,
     "image": cmd_image,
     "video": cmd_video,

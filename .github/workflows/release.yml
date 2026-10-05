@@ -1,0 +1,45 @@
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install build twine
+      - run: python -m build
+      - run: python -m twine check dist/*
+      - run: python scripts/check_artifacts.py
+      - run: python -m pip install dist/*.whl
+      - run: python -m unittest discover -s tests -v
+      - run: python scripts/smoke_installed.py
+      - name: Check tag matches package version
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          python -c 'import os; from google_flow_skill import __version__; assert os.environ["RELEASE_TAG"] == "v" + __version__'
+      - name: Stage release assets in a draft
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          sha256sum dist/* > dist/SHA256SUMS.txt
+          notes="docs/releases/${RELEASE_TAG}.md"
+          if gh release view "$RELEASE_TAG" > /dev/null 2>&1; then
+            gh release upload "$RELEASE_TAG" dist/* --clobber
+          elif [ -f "$notes" ]; then
+            gh release create "$RELEASE_TAG" dist/* --verify-tag --draft --title "Google Flow Skill $RELEASE_TAG" --notes-file "$notes"
+          else
+            gh release create "$RELEASE_TAG" dist/* --verify-tag --draft --title "Google Flow Skill $RELEASE_TAG" --generate-notes
+          fi

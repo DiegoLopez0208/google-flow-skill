@@ -1,262 +1,179 @@
-# Google Flow Skill 🎬
+# Google Flow Skill
 
-Give your AI agent (Claude Code, Codex, Gemini, Antigravity...) the power to
-**drive Google Flow** and generate images and videos, using your own saved login.
+**Give your AI agent a script. Let it generate and download the scenes in Google Flow.**
 
-You download this folder, log in once, and then just ask your agent for what you
-want: *"generate these images"*, *"animate this scene"*, *"follow this 5-scene
-script"*.
+[![Tests](https://github.com/DiegoLopez0208/google-flow-skill/actions/workflows/tests.yml/badge.svg)](https://github.com/DiegoLopez0208/google-flow-skill/actions/workflows/tests.yml)
+[![Release](https://img.shields.io/github/v/release/DiegoLopez0208/google-flow-skill)](https://github.com/DiegoLopez0208/google-flow-skill/releases/latest)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-> **Generating costs credits.** Flow charges credits to your Google account on
-> every generation (a Veo video costs roughly 10x an image) and the balance
-> resets once a month. Check what you have left with `python flow.py credits`;
-> `batch` estimates the cost and stops before spending if it won't fit.
+Google Flow Skill gives Claude Code, Codex, Gemini and other agents a CLI for
+Google Flow. It runs image/video jobs in order, reuses earlier images as
+references, supports first/last frames, checks credits and downloads results.
+You sign in through Chrome; no API key is required.
 
-## Install as a Claude Code plugin
+**The code is free. Google Flow access and generation costs depend on your
+Google account, model and plan.** References help continuity but cannot
+guarantee identical characters across shots.
 
+## Watch it work
+
+[Download the short demo (MP4, English captions, 40 seconds)](https://github.com/DiegoLopez0208/google-flow-skill/releases/download/v2.3.0/google-flow-demo-en.mp4).
+It combines previously recorded Flow panels and generated output with editorial
+captions. Waiting time is edited; it is not a performance benchmark.
+
+## Install the CLI
+
+Requires **Python 3.10+ and Google Chrome**. Until the PyPI project is published,
+install the versioned package directly from GitHub:
+
+```sh
+python -m pip install "git+https://github.com/DiegoLopez0208/google-flow-skill.git@v2.3.0"
+google-flow --version
+google-flow login
+google-flow credits
 ```
+
+This route also requires Git. Without Git, download the `.whl` from
+[Releases](https://github.com/DiegoLopez0208/google-flow-skill/releases/latest)
+and run `python -m pip install /path/to/google_flow_skill-2.3.0-py3-none-any.whl`.
+If `google-flow` is not on PATH, use `python -m google_flow_skill` instead.
+Playwright uses your installed Chrome; downloading a separate Chromium browser
+does not replace that requirement.
+
+### Claude Code plugin
+
+```text
 /plugin marketplace add DiegoLopez0208/google-flow-skill
-/plugin install google-flow
+/plugin install google-flow@diego-google-flow
 ```
 
-The manifest lives in `.claude-plugin/plugin.json` and the agent manual in
-`skills/google-flow/SKILL.md` (a single file, so there are never two versions of
-it). Installed this way, `flow.py` sits at the plugin root: the agent has to cd
-into that folder before running any command.
+The plugin supplies the agent manual. On first use the agent installs the Python
+runtime from the plugin root with `python install.py`, then runs `google-flow
+login`. You complete the Google sign-in yourself.
 
-You still need `python setup.py` and `python flow.py login` once.
+### Codex, Gemini and other agents
 
-## Install (let your agent do it)
+Install the manual with the [skills CLI](https://skills.sh/docs):
 
-### Option A — from GitHub, without downloading anything yourself
-Open your AI agent in an empty folder and tell it:
+```sh
+npx skills add DiegoLopez0208/google-flow-skill --skill google-flow
+```
 
-> **"Clone this repo and install the Google Flow skill: `https://github.com/DiegoLopez0208/google-flow-skill`"**
+The manual bootstraps the Python CLI separately. The skills installer does not
+copy the browser engine with the manual. Alternatively, clone this repository,
+open your agent in it and ask it to install and use Google Flow Skill:
 
-The agent will do this on its own:
-```powershell
+```sh
 git clone https://github.com/DiegoLopez0208/google-flow-skill
 cd google-flow-skill
-python setup.py        # installs dependencies + browser
-python flow.py login   # opens Chrome -> you sign in -> session is saved
+python install.py
 ```
 
-### Option B — you already have the folder
-Open your agent INSIDE the folder and tell it **"install the Google Flow skill"**.
-It runs `setup.py` by itself and then asks you to sign in.
+`python setup.py` remains a compatibility alias for the installer.
 
-### By hand (if you prefer)
-You need Python 3.10+ and Google Chrome:
+## First run
+
+Ask your agent:
+
+> Generate an astronaut reference image, then make two scenes using it. Check
+> the available credits before generating and show me the batch report.
+
+Or use the CLI directly:
+
+```sh
+google-flow image --prompt "A small robot waving in a sunlit workshop" --name robot
+google-flow video --prompt "The robot waves slowly" --refs /path/to/robot.png --name scene1
+google-flow video --prompt "Slow camera push-in" --start /path/to/first.png --duration 4 --gen-res 360p
+google-flow examples --out flow-examples
+google-flow batch flow-examples/example_script.json
+```
+
+`examples` only copies scripts; `image`, `video` and `batch` generate and may
+spend credits. Read and adapt the examples before running them.
+
+## Ordered batches
+
+```json
+{
+  "project": "robot_short",
+  "defaults": { "ratio": "9:16", "image_model": "Nano Banana 2" },
+  "jobs": [
+    { "type": "image", "name": "robot", "prompt": "A small robot in a workshop" },
+    { "type": "video", "name": "scene1", "refs": ["robot"], "prompt": "The robot waves" },
+    { "type": "video", "name": "scene2", "start": "robot", "prompt": "The robot turns slowly" }
+  ]
+}
+```
+
+Jobs execute in one Flow project. `refs` uses ingredients for visual guidance;
+`start`/`end` use Frames mode. Inside a batch, earlier job names can be used as
+references. `batch_report.json` records successes, files and errors. Each run
+creates a new project; existing projects are not resumed.
+
+## Credits, files and sessions
+
+- `google-flow credits` reads the account balance. Batches use a rough upfront
+  estimate and stop if it exceeds the balance. Video setup also prints the
+  price returned by Flow's UI when available. Estimates are not a spending
+  guarantee; review the output and current model pricing.
+- `--ignore-credits` bypasses the upfront batch estimate. Do not use it unless
+  you have deliberately accepted the cost.
+- Installed packages keep sessions and default output in
+  `~/.google-flow-skill/session/` and `~/.google-flow-skill/outputs/`.
+  Running `python flow.py` in a source/plugin checkout retains `session/` and
+  `outputs/` at that checkout's root. The installed executable uses package state.
+- Set `FLOW_HOME` to change the data directory, `FLOW_CHROME_PROFILE` to use a
+  specific profile, or `--out` to choose an output directory. Sign in again if
+  you switch to a different profile. A saved session can expire or be revoked.
+- `google-flow status` checks for saved profile files, not live authentication.
+- `google-flow logout --yes` removes the saved session. `google-flow clean
+  PROJECT` deletes that project's local results.
+
+## Browser recording
+
 ```powershell
-python setup.py
-python flow.py login
+$env:FLOW_RECORD_DIR="outputs/recording"
+google-flow batch flow-examples/example_script.json
 ```
 
-> Your Google session lives in `session/` and is NEVER pushed to GitHub (it's in
-> `.gitignore`).
+Playwright records the browser viewport, including any account details visible
+in Flow. Crop or blur those details before sharing. One `.webm` is saved per
+tab; the CLI reports the largest recording.
 
-## Try it without an agent
+## Compatibility and limits
 
-```powershell
-python flow.py credits           # credit balance (generating costs)
-python flow.py image --prompt "a cute robot waving, cinematic, vertical" --name test
-python flow.py video --prompt "they argue" --refs a.png,b.png --name scene1
-python flow.py batch examples/example_script.json
-python flow.py batch examples/character_refs_script.json
-python flow.py clean demo_flow   # delete one project's output when you're done
-python flow.py logout --yes      # delete the saved Google session
+- The browser layer was ported to Flow's Angular UI in September 2026. UI
+  changes can break selectors; some labels expect Spanish (`es-419`). Other
+  locales have not been verified.
+- Frames mode was restored in 2.1.0. Text-to-image, text-to-video, ingredients,
+  frames, duration and generation resolution are supported by the CLI; model
+  availability still depends on Flow.
+- Generation uses a real Chrome browser. Downloads prefer Flow's internal HTTP
+  endpoints and fall back to the browser. This is an unofficial integration.
+- Google can reject automated requests or require additional verification.
+  Review the terms applicable to your account; this project makes no assurance
+  about account restrictions or continued compatibility.
+- There is no built-in video editor, voice-over/TTS or subtitle pipeline.
+- The 2.3.0 checks validate packaging and CLI wiring without live generation.
+  Historical browser verification is recorded in [CHANGELOG.md](CHANGELOG.md).
+
+## Development
+
+```sh
+python -m pip install -r requirements.txt
+python -m unittest discover -s tests -v
+python -m pip install build twine
+python -m build
+python -m twine check dist/*
 ```
 
-Record the browser while it works, for a demo or to debug a selector:
+The complete manual is in [skills/google-flow/SKILL.md](skills/google-flow/SKILL.md).
+After installing the package, `google-flow skill-path` locates its bundled copy.
+Release and PyPI setup are documented in [docs/RELEASING.md](docs/RELEASING.md).
 
-```powershell
-$env:FLOW_RECORD_DIR="outputs/recording"   # optional: FLOW_RECORD_SIZE=1280x900
-python flow.py batch examples/example_script.json
-```
+## Origin
 
-Playwright captures **only the browser viewport**, never the rest of your
-desktop. It writes one `.webm` per tab, so the guard tab leaves a tiny useless
-one — the biggest file is the real session, and the CLI prints which it is. Note
-that Flow's header shows the signed-in account, so crop that corner before
-publishing a recording.
-
-CLI wiring tests (they never touch the browser or your account):
-
-```powershell
-python -m unittest discover -s tests
-```
-
-One-off commands land in `outputs/`; each `batch` is grouped into
-`outputs/<project>/`.
-
-## What's inside
-
-| File / folder | What it is |
-|---|---|
-| `flow.py` | The CLI. The only thing you (or the agent) need. |
-| `skills/google-flow/SKILL.md` | Agent manual (how to read scripts and orchestrate). |
-| `SKILL.md` | Pointer to the manual, so the repo also works as a skill folder. |
-| `.claude-plugin/plugin.json` | Manifest for installing it as a plugin. |
-| `AGENTS.md` / `GEMINI.md` | Onboarding for different agents. |
-| `flow_provider/` | Internal engine (Playwright + Flow's own API). Don't touch. |
-| `session/` | Your persistent Google session (filled by `login`). |
-| `outputs/` | Your generated images and videos. |
-| `examples/` | Example scripts for `batch`. |
-
-## Notes
-- The session is **persistent**: it doesn't expire on a timer as long as you keep
-  `session/`.
-- Uses the real Google Chrome installed on your system.
-- No API key needed.
-- Flow's UI is in Spanish (`es-419`) on this account, and some selectors depend
-  on that. Selector strings like `"Descargar"` or `"créditos"` are Flow's own UI
-  text, not leftovers from translation.
-
-> **On Terms of Service:** automating Flow goes against Google's ToS, like any
-> other tool in this family (`notebooklm-py` and friends do the same thing over
-> the same RPC). There are no reports of accounts being banned over it, so the
-> realistic risk is low. Two things are specific to Flow, though: it runs
-> reCAPTCHA Enterprise on the generation path and answers
-> `PUBLIC_ERROR_UNUSUAL_ACTIVITY` when it does not like a request, so there *is*
-> active detection here; and generating spends paid credits, which gives Google
-> more reason to care than a read-only tool would. A secondary account is the
-> cautious choice, not a required one.
-
-## Where this comes from
-
-This started from [BRPLia/google-flow-skill-v1](https://github.com/BRPLia/google-flow-skill-v1)
-(MIT), whose shape — a narrow CLI plus a manual the agent reads — is the right
-idea and worth the credit. It is now maintained here as its own project: the
-browser layer was rewritten, downloads moved off the browser entirely, and
-credits, logout, plugin packaging and tests were added.
-
-Per-release detail lives in [CHANGELOG.md](CHANGELOG.md).
-
-### Ported to Flow's new UI (2026-09-16)
-
-Google rewrote Flow: it moved to `flow.google.com` and switched from React/Radix
-to Angular Material. **None of the original selectors match anymore**, so the
-older version cannot drive Flow at all. This one is ported and verified against
-the current UI:
-
-| What | Status |
-|---|---|
-| `image` (text -> image) | Verified end to end |
-| `batch` with several jobs | Verified |
-| `video` with `--refs` (ingredients) | Verified: image -> video that references it |
-| `--start` / `--end` (frames) | **Not ported**: the UI no longer has those slots |
-| Download | Works, over Flow's API, with automatic fallback |
-
-### Credits
-
-Generating costs credits, and only the account menu tells you how many are left
-("7 créditos de Google Flow"). The in-project banner warns you when they're low
-but never says the number, so it isn't enough on its own.
-
-- `python flow.py credits` shows the balance and a cost reference.
-- Opening a project reads the balance (it's free — the browser is already open).
-- `batch` estimates the cost of the whole run and **stops without generating**
-  if it won't fit. Override with `--ignore-credits`; that's the user's call.
-
-Cost figures are not published by Google. `ESTIMATED_COST` in
-`flow_provider/credits.py` is an upper bound used only to warn, never to bill or
-to decide silently.
-
-### Download over the API, no browser
-
-Flow speaks `batchexecute`, the same Google RPC that NotebookLM uses. Mapped on
-2026-09-16:
-
-| RPC | What it does |
-|---|---|
-| `jHPbke` | create project |
-| `ngNC2` | list a project's contents |
-| `as29s` | asset info, including the original file URL |
-| `ogiZ0b` | generate — **cannot be replicated**, see below |
-
-`flow_provider/api.py` implements the client with the standard library: cookies
-plus the `SNlM0e` token, and `f.sid`/`bl` scraped from the HTML.
-
-Two things that cost real time to find:
-
-- Send **only** the cookies for `google.com` and `flow.google.com`. Include
-  `accounts.google.com` ones and Google answers 401 to writes while still
-  letting reads through, which is thoroughly misleading.
-- An asset's `src` in the DOM is the **thumbnail** (286x512 webp) and accepts no
-  size suffix (`=s0`, `=w2048` return 400). Images don't expose their UUID in the
-  DOM either, so asset ids are picked up by watching Flow's own network
-  responses.
-
-`as29s` for a video also returns its thumbnail URL; taking the first one
-downloaded a 46 KB PNG instead of the MP4. URLs are now filtered by the media
-type being requested.
-
-### Generating over the API is not possible
-
-The `ogiZ0b` payload carries a reCAPTCHA Enterprise token (~1.8 KB, starts with
-`0cAF`). Replay an old one and Flow answers:
-
-```
-PUBLIC_ERROR_UNUSUAL_ACTIVITY
-```
-
-So generation needs a real browser. Everything else goes over HTTP.
-
-### Chrome crashes on some downloads
-
-It's a crash of the browser itself, not Playwright: the profile is left marked
-`Crashed`. Mitigated by disabling the GPU and Safe Browsing's download
-verification, and by sanitizing the profile on every launch — it still happens
-occasionally.
-
-Since downloads now go over the API, this rarely matters. When the browser path
-is used as a fallback, the CLI recovers on its own:
-
-- retries the download up to 3 times, relaunching the browser and returning to
-  the same Flow project;
-- on reload an asset's `src` changes (it carries an expiring token), so results
-  are relocated by their position in the canvas;
-- inside a `batch`, every job checks the browser is alive before starting, so one
-  crash no longer drags down the jobs that follow.
-
-Nothing generated is ever lost: it stays in the Flow project even if the download
-fails.
-
-### Map of the new UI, in case selectors need repairing
-
-```
-flow-base-prompt-box button[aria-label*="onfiguraci"]   model, ratio, count
-  [role=radio] "image" / "videocam"                     mode
-  [role=radio] "crop_9_16" ...                          ratio (icon names)
-  [role=radio] "x1".."x4"                               count
-button[aria-label*="niciar generaci"]                   submit
-button[aria-label*="ingredientes al cuadro"]            references and upload
-flow-tile-container                                     each result
-  img.image (image) / img.thumbnail (video)
-  button[aria-label*="opciones"] -> Descargar -> resolution
-```
-
-Selectors are anchored to google-symbols **icon names** (`image`, `videocam`,
-`crop_9_16`, `x1`) because those don't get translated, unlike the visible labels.
-
-### Logic fixes carried over from the original (these hold on any UI)
-- `--image` / `--refs` now **do** attach the reference to the prompt. Before, the
-  image was left loose on the canvas and generation ignored it.
-- The retry on "No se pudo generar" works inside a `batch` again. It used to only
-  fire on the first job and then burn the whole timeout.
-- `--model`, `--ratio`, `--count` and `--res` are validated **before** the browser
-  opens; a typo no longer silently generates with a different model.
-- `--count N` downloads all N variants (`<name>_1`..`<name>_N`), not just the first.
-- `batch_report.json` is always written, even when creating the project fails.
-- The browser is shut down even if closing the context fails, so no node
-  processes are left hanging.
-- `--no-sandbox` only on Linux.
-
-### New
-- **Ingredients mode in the CLI**: `--refs` / `"refs": [...]` in a script.
-  References by local file or by the `name` of an earlier job in the same batch —
-  that reuses the asset already in the Flow project instead of re-uploading it.
-  This is what gives character consistency.
-- `python flow.py credits` and `python flow.py logout`.
-- `--res` to pick the download resolution.
-- Browser-free wiring tests (`tests/`).
+Started from [BRPLia/google-flow-skill-v1](https://github.com/BRPLia/google-flow-skill-v1)
+(MIT). Maintained here as its own project with a rewritten browser layer,
+download recovery, credit checks, plugin distribution and tests. Original
+attribution is retained in the license and changelog.

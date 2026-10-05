@@ -1,0 +1,52 @@
+[build-system]
+requires = ["hatchling>=1.27,<2"]
+build-backend = "hatchling.build"
+
+[project]
+name = "google-flow-skill"
+version = "2.3.0"
+description = "Drive Google Flow from an AI agent: ordered image/video batches, references and credit checks."
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Diego Lopez" }]
+keywords = ["google-flow", "agent-skill", "veo", "nano-banana", "playwright"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Environment :: Console",
+  "Intended Audience :: Developers",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Multimedia :: Video",
+]
+dependencies = ["playwright>=1.49.0", "python-dotenv>=1.0"]
+
+[project.urls]
+Homepage = "https://github.com/DiegoLopez0208/google-flow-skill"
+Repository = "https://github.com/DiegoLopez0208/google-flow-skill"
+Issues = "https://github.com/DiegoLopez0208/google-flow-skill/issues"
+Changelog = "https://github.com/DiegoLopez0208/google-flow-skill/blob/main/CHANGELOG.md"
+
+[project.scripts]
+google-flow = "flow:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["flow_provider", "google_flow_skill"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"flow.py" = "flow.py"
+"skills/google-flow/SKILL.md" = "google_flow_skill/data/SKILL.md"
+"examples/example_script.json" = "google_flow_skill/data/example_script.json"
+"examples/character_refs_script.json" = "google_flow_skill/data/character_refs_script.json"
+
+[tool.hatch.build.targets.sdist]
+include = [
+  "/flow.py", "/flow_provider", "/google_flow_skill", "/skills", "/examples",
+  "/.claude-plugin", "/tests", "/scripts", "/docs", "/pyproject.toml", "/setup.py",
+  "/install.py", "/requirements.txt", "/README.md", "/CHANGELOG.md",
+  "/LICENSE", "/AGENTS.md", "/GEMINI.md",
+]

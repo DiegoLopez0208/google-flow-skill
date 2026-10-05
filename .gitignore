@@ -3,12 +3,21 @@ __pycache__/
 *.pyc
 .venv/
 venv/
+dist/
+build/
+*.egg-info/
+.release-check/
+.claude/settings.local.json
+.agents/
+skills-lock.json
 
 # Variables de entorno (por si alguien agrega una .env)
 .env
 
 # Capturas de depuracion
 _debug/
+_*.png
+_*.json
 
 # Guion privado del video (no publicar)
 GUIA_VIDEO.md

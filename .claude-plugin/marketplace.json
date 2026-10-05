@@ -1,0 +1,13 @@
+{
+  "name": "diego-google-flow",
+  "owner": { "name": "Diego Lopez" },
+  "metadata": { "description": "Google Flow automation for AI agents" },
+  "plugins": [
+    {
+      "name": "google-flow",
+      "source": "./",
+      "description": "Generate and download Google Flow images and videos from an ordered script.",
+      "version": "2.3.0"
+    }
+  ]
+}

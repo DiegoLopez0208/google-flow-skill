@@ -1,0 +1,54 @@
+name: publish-pypi
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Published GitHub release tag (for example v2.3.0)"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install build twine
+      - run: python -m build
+      - run: python -m twine check dist/*
+      - run: python scripts/check_artifacts.py
+      - run: python -m pip install dist/*.whl
+      - run: python -m unittest discover -s tests -v
+      - run: python scripts/smoke_installed.py
+      - name: Check tag matches package version
+        env:
+          RELEASE_TAG: ${{ inputs.tag }}
+        run: |
+          python -c 'import os; from google_flow_skill import __version__; assert os.environ["RELEASE_TAG"] == "v" + __version__'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pypi-distributions
+          path: dist/
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/google-flow-skill
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: pypi-distributions
+          path: dist/
+      - uses: pypa/gh-action-pypi-publish@release/v1
