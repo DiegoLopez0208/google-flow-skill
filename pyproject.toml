@@ -48,5 +48,6 @@ include = [
   "/flow.py", "/flow_provider", "/google_flow_skill", "/skills", "/examples",
   "/.claude-plugin", "/tests", "/scripts", "/docs", "/pyproject.toml", "/setup.py",
   "/install.py", "/requirements.txt", "/README.md", "/CHANGELOG.md",
-  "/LICENSE", "/AGENTS.md", "/GEMINI.md",
+  "/LICENSE", "/GEMINI.md",
 ]
+exclude = ["/AGENTS.md", "/agents.md", "/docs/LAUNCH.md", "/LAUNCH.md", "/launch.md"]

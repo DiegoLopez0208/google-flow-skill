@@ -11,6 +11,12 @@ build/
 .agents/
 skills-lock.json
 
+# Local agent instructions and launch planning (keep copies, do not publish).
+AGENTS.md
+agents.md
+LAUNCH.md
+launch.md
+
 # Variables de entorno (por si alguien agrega una .env)
 .env
 
