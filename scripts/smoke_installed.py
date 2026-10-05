@@ -4,6 +4,7 @@ import json
 import os
 import subprocess
 import sys
+import sysconfig
 import tempfile
 from pathlib import Path
 
@@ -46,7 +47,7 @@ def main():
         run("-c", "import os; from pathlib import Path; from flow_provider import settings; "
             "assert settings.DATA_DIR == Path(os.environ['FLOW_HOME']).resolve(); "
             "assert settings.FLOW_CHROME_PROFILE == str(settings.DATA_DIR/'session'/'flowbot-profile')")
-        executable = Path(sys.executable).parent / ("google-flow.exe" if os.name == "nt" else "google-flow")
+        executable = Path(sysconfig.get_path("scripts")) / ("google-flow.exe" if os.name == "nt" else "google-flow")
         result = subprocess.run([str(executable), "--version"], cwd=cwd, env=env,
                                 capture_output=True, text=True)
         assert result.returncode == 0 and result.stdout.strip() == "google-flow 2.3.0", result
