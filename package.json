@@ -1,0 +1,16 @@
+{
+  "name": "google-flow-skill",
+  "version": "2.3.0",
+  "description": "Install and run the Python Google Flow CLI from npx: agent-driven image/video batches.",
+  "license": "MIT",
+  "author": "Diego Lopez",
+  "repository": { "type": "git", "url": "git+https://github.com/DiegoLopez0208/google-flow-skill.git" },
+  "homepage": "https://github.com/DiegoLopez0208/google-flow-skill#readme",
+  "bugs": { "url": "https://github.com/DiegoLopez0208/google-flow-skill/issues" },
+  "keywords": ["google-flow", "agent-skill", "claude-code", "codex", "veo"],
+  "engines": { "node": ">=20" },
+  "bin": { "google-flow-skill": "npm/cli.cjs" },
+  "files": ["npm/cli.cjs"],
+  "scripts": { "test": "node scripts/smoke_npm.cjs" },
+  "publishConfig": { "access": "public", "registry": "https://registry.npmjs.org/" }
+}
