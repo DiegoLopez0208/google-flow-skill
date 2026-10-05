@@ -25,6 +25,7 @@ with tarfile.open(sdist) as archive:
     names += [member.name.split("/", 1)[-1] for member in archive.getmembers()]
 for name in names:
     parts = Path(name).parts
+    assert Path(name).name.lower() not in {"agents.md", "launch.md"}, name
     assert not any(part in {"session", "outputs", ".venv", ".release-check", "__pycache__"}
                    for part in parts), name
     assert not name.endswith((".png", ".mp4", ".webm", ".pyc")), name
