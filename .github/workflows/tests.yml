@@ -10,12 +10,7 @@ on:
 
 jobs:
   npm-install:
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        # Use an explicit Windows image after repeated windows-latest allocation failures.
-        os: [ubuntu-latest, windows-2022]
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -58,11 +53,10 @@ jobs:
         run: python -m unittest discover -s tests -v
 
   package-install:
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-2022]
         python-version: ["3.10", "3.13"]
     steps:
       - uses: actions/checkout@v4
