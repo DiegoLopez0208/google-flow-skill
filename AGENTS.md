@@ -7,8 +7,8 @@ CLI: `flow.py`.
 ## What to know on arrival
 1. Read `skills/google-flow/SKILL.md` (your complete manual). Do not read inside
    `flow_provider/`: that is the internal engine.
-2. **Install it yourself** the first time: run `python setup.py` (it installs the
-   dependencies and the browser). Do not ask the user to do it; you have a
+2. **Install it yourself** the first time: run `python install.py` (it installs the
+   Python package and dependencies). Do not ask the user to do it; you have a
    terminal.
 3. Then `python flow.py status`. If there is no session, run
    `python flow.py login` and ask the user to sign in in the Chrome window that
@@ -31,8 +31,7 @@ python flow.py logout --yes                  # delete the saved session
 
 ## Rules
 - **Credits are the scarce resource.** Check them with `python flow.py credits`
-  before planning a batch and tell the user what it will cost. A Veo video costs
-  ~10x an image. `batch` stops on its own when the balance will not cover it.
+  before planning a batch and tell the user what it will cost. Costs depend on the model and plan. `batch` stops when its rough estimate exceeds the balance.
 - For 2+ jobs: write a `script.json` (format in `skills/google-flow/SKILL.md` and
   `examples/`) and use `batch`. Output is grouped in `outputs/<project>/`. To
   chain inside a batch, a video's `refs` can be just the name of the image job.
@@ -44,5 +43,5 @@ python flow.py logout --yes                  # delete the saved session
   as much.
 - Narration and voice-over do NOT go to Flow. (Careful: Veo 3.1 does generate
   audio, so spoken dialogue DOES go inside the video prompt.)
-- `--start`/`--end` (frames) is not ported to the new UI: use `--refs`.
-- Be tidy, and be honest about the limits (section 7 of the manual).
+- `--start`/`--end` use Frames mode; `--refs` uses Ingredients mode.
+- Be tidy, and be honest about the limits (section 6 of the manual).
