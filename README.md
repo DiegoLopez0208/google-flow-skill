@@ -40,6 +40,31 @@ If `google-flow` is not on PATH, use `python -m google_flow_skill` instead.
 Playwright uses your installed Chrome; downloading a separate Chromium browser
 does not replace that requirement.
 
+### npm / npx installer
+
+With **Node.js 20+**, use npm to prepare an isolated Python runtime:
+
+```sh
+npx google-flow-skill setup
+npx google-flow-skill doctor
+npx google-flow-skill login
+npx google-flow-skill credits
+npx google-flow-skill batch script.json
+```
+
+Python 3.10+ and Google Chrome are still required. `setup` downloads the fixed
+2.3.0 wheel from GitHub Releases, verifies its SHA-256 and installs it and its
+dependencies in `~/.google-flow-skill/runtime-npm-2.3.0`. It does not need Git
+or a PyPI release of this project. `doctor` checks local requirements without
+opening Chrome or spending credits; Google login and credits are checked
+separately. Installing the npm package alone does not install Python packages.
+
+Use `npx google-flow-skill run <arguments>` to pass any arguments to the Python
+CLI, including `run --help` and `run --version`. `GOOGLE_FLOW_PYTHON` can select
+a Python executable; `GOOGLE_FLOW_RUNTIME_DIR` can select the environment
+directory. Sessions and outputs keep the Python CLI's usual state paths.
+The agent manual still installs separately with `npx skills add` below.
+
 ### Claude Code plugin
 
 ```text

@@ -13,6 +13,8 @@ skills-lock.json
 
 # Local agent instructions and launch planning (keep copies, do not publish).
 AGENTS.md
+.npm-check/
+*.tgz
 agents.md
 LAUNCH.md
 launch.md

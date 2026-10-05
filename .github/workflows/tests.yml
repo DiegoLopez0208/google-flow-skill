@@ -9,6 +9,25 @@ on:
   pull_request:
 
 jobs:
+  npm-install:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Pack and inspect npm distribution
+        run: node scripts/check_npm_pack.cjs
+      - name: Test packed executable
+        run: node scripts/smoke_npm.cjs .npm-check/package/npm/cli.cjs
+
   wiring-tests:
     runs-on: ubuntu-latest
     strategy:
