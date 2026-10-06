@@ -22,6 +22,19 @@ guarantee identical characters across shots.
 
 ## Watch it work
 
+### English demo with narration (54 seconds)
+
+[![Watch the narrated English demo](https://raw.githubusercontent.com/DiegoLopez0208/google-flow-skill/main/assets/english-demo-preview.jpg)](https://github.com/DiegoLopez0208/google-flow-skill/releases/download/v2.3.0/google-flow-demo-english-voiced.mp4)
+
+**[Watch / download the English video](https://github.com/DiegoLopez0208/google-flow-skill/releases/download/v2.3.0/google-flow-demo-english-voiced.mp4)** ·
+[English subtitles (SRT)](https://github.com/DiegoLopez0208/google-flow-skill/releases/download/v2.3.0/google-flow-demo-english-voiced.srt)
+
+English titles, captions and synthetic narration, with the current plugin and
+npm install commands. Uses the original recorded Flow footage; captured Flow
+UI labels remain Spanish. The generation and its displayed credit cost are
+historical. Waiting time is edited; this is not a performance benchmark or a
+new live generation test. No new Flow credits were spent on this edit.
+
 ### Original LinkedIn demo (Spanish, 59 seconds)
 
 [![Watch the original LinkedIn demo](https://raw.githubusercontent.com/DiegoLopez0208/google-flow-skill/main/assets/linkedin-demo-preview.jpg)](https://github.com/DiegoLopez0208/google-flow-skill/releases/download/v2.3.0/flow_skill_linkedin_v06.mp4)
@@ -33,7 +46,7 @@ re-editing. Installation commands shown in that recording predate the current
 marketplace setup; use the current instructions below. Edited waits and credit
 prices reflect that recording, not a current performance or pricing guarantee.
 
-### Short demo (English)
+### Short caption-only demo (English)
 
 [Download the short demo (MP4, English captions, 40 seconds)](https://github.com/DiegoLopez0208/google-flow-skill/releases/download/v2.3.0/google-flow-demo-en.mp4).
 It combines previously recorded Flow panels and generated output with editorial
