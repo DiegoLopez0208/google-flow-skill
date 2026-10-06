@@ -4,7 +4,12 @@
 
 [![Tests](https://github.com/DiegoLopez0208/google-flow-skill/actions/workflows/tests.yml/badge.svg)](https://github.com/DiegoLopez0208/google-flow-skill/actions/workflows/tests.yml)
 [![Release](https://img.shields.io/github/v/release/DiegoLopez0208/google-flow-skill)](https://github.com/DiegoLopez0208/google-flow-skill/releases/latest)
+[![npm](https://img.shields.io/npm/v/google-flow-skill)](https://www.npmjs.com/package/google-flow-skill)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
+[npm package](https://www.npmjs.com/package/google-flow-skill) ·
+[Agent skill](https://skills.sh/diegolopez0208/google-flow-skill/google-flow) ·
+[Downloads & videos](https://github.com/DiegoLopez0208/google-flow-skill/releases/latest)
 
 Google Flow Skill gives Claude Code, Codex, Gemini and other agents a CLI for
 Google Flow. It runs image/video jobs in order, reuses earlier images as
@@ -17,11 +22,40 @@ guarantee identical characters across shots.
 
 ## Watch it work
 
+### Original LinkedIn demo (Spanish, 59 seconds)
+
+[![Watch the original LinkedIn demo](https://raw.githubusercontent.com/DiegoLopez0208/google-flow-skill/main/assets/linkedin-demo-preview.jpg)](https://github.com/DiegoLopez0208/google-flow-skill/releases/download/v2.3.0/flow_skill_linkedin_v06.mp4)
+
+**[Watch / download the original LinkedIn video](https://github.com/DiegoLopez0208/google-flow-skill/releases/download/v2.3.0/flow_skill_linkedin_v06.mp4)**
+
+This is the original September 2026 recording, with audio, uploaded without
+re-editing. Installation commands shown in that recording predate the current
+marketplace setup; use the current instructions below. Edited waits and credit
+prices reflect that recording, not a current performance or pricing guarantee.
+
+### Short demo (English)
+
 [Download the short demo (MP4, English captions, 40 seconds)](https://github.com/DiegoLopez0208/google-flow-skill/releases/download/v2.3.0/google-flow-demo-en.mp4).
 It combines previously recorded Flow panels and generated output with editorial
 captions. Waiting time is edited; it is not a performance benchmark.
 
 ## Install the CLI
+
+### Quick start with npm
+
+Published on **[npm as `google-flow-skill`](https://www.npmjs.com/package/google-flow-skill)**:
+
+```sh
+npx google-flow-skill setup
+npx google-flow-skill doctor
+npx google-flow-skill login
+```
+
+Requires **Node.js 20+, Python 3.10+ and Google Chrome**. `setup` installs the
+Python runtime in a separate environment; `doctor` checks the local requirements.
+The npm package is an installer/launcher. See the npm section below for details.
+
+### Python installation
 
 Requires **Python 3.10+ and Google Chrome**. Until the PyPI project is published,
 install the versioned package directly from GitHub:
